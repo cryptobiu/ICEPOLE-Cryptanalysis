@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <openssl/rand.h>
 
 #include <iostream>
 #include <sstream>
@@ -22,21 +23,21 @@
 
 #include <event2/event.h>
 
-void get_options(int argc, char *argv[], int * log_level, size_t * thread_count, unsigned int * required_result_count);
+void get_options(int argc, char *argv[], int * log_level, size_t * thread_count, unsigned int * required_tests, unsigned int * required_results);
 void show_usage(const char * prog);
 void init_log(const char * a_log_file, const char * a_log_dir, const int log_level, const char * logcat);
 void cryptanalysis(size_t thread_count);
 
 static const char * logcat = "ca4ip.log";
 static const char * rescat = "ca4ip.res";
-unsigned int result_count = 0, required_results = UINT_MAX;
+unsigned int tests = 0, results = 0, required_tests = UINT_MAX, required_results = UINT_MAX;
 sem_t run_flag;
 
 int main(int argc, char *argv[])
 {
 	int log_level = 500; //notice
 	size_t thread_count = 1;
-	get_options(argc, argv, &log_level, &thread_count, &required_results);
+	get_options(argc, argv, &log_level, &thread_count, &required_tests, &required_results);
 
 	mkdir("./logs", S_IRWXU | S_IRWXG | S_IRWXO);
 	init_log("icepole_cryptanalysis.log", "./logs", log_level, logcat);
@@ -66,7 +67,7 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void get_options(int argc, char *argv[], int * log_level, size_t * thread_count, unsigned int * required_result_count)
+void get_options(int argc, char *argv[], int * log_level, size_t * thread_count, unsigned int * required_tests, unsigned int * required_results)
 {
 	int opt;
 	while ((opt = getopt(argc, argv, "hl:t:")) != -1)
@@ -82,8 +83,11 @@ void get_options(int argc, char *argv[], int * log_level, size_t * thread_count,
 		case 't':
 			*thread_count = (size_t)strtol(optarg, NULL, 10);
 			break;
+		case 's':
+			*required_tests = (unsigned int)strtol(optarg, NULL, 10);
+			break;
 		case 'r':
-			*required_result_count = (unsigned int)strtol(optarg, NULL, 10);
+			*required_results = (unsigned int)strtol(optarg, NULL, 10);
 			break;
 		default:
 			std::cerr << "Invalid program arguments." << std::endl;
@@ -99,6 +103,8 @@ void show_usage(const char * prog)
 	std::cout << prog << "   [ OPTIONS ]" << std::endl;
 	std::cout << "-l   log level (notice)" << std::endl;
 	std::cout << "-t   threads count (1)" << std::endl;
+	std::cout << "-s   test count (unlimited)" << std::endl;
+	std::cout << "-r   result count (unlimited)" << std::endl;
 }
 
 void init_log(const char * a_log_file, const char * a_log_dir, const int log_level, const char * logcat)
@@ -251,10 +257,16 @@ void sigint_cb(evutil_socket_t, short, void * arg)
 
 void timer_cb(evutil_socket_t, short, void * arg)
 {
-	unsigned int current_result_count = __sync_fetch_and_add(&result_count, 0);
+	unsigned int current_result_count = __sync_fetch_and_add(&results, 0);
 	if(current_result_count >= required_results)
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: %u results reached; breaking event loop.", __FUNCTION__, current_result_count);
+		event_base_loopbreak((struct event_base *)arg);
+	}
+	unsigned int current_test_count = __sync_fetch_and_add(&tests, 0);
+	if(current_test_count >= required_tests)
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: %u tests reached; breaking event loop.", __FUNCTION__, current_test_count);
 		event_base_loopbreak((struct event_base *)arg);
 	}
 }
@@ -325,7 +337,7 @@ void cryptanalyser_round(const char * locat, const char * recat)
 							if(0 == test(c1, c2, MSG_SIZE))
 							{
 								log_result(m1, m2, c1, c2, MSG_SIZE, recat);
-								__sync_fetch_and_add(&result_count, 1);
+								__sync_fetch_and_add(&results, 1);
 							}
 						}
 						else
@@ -376,4 +388,12 @@ void log_result(const u_int8_t * m1, const u_int8_t * m2, const u_int8_t * c1, c
 	result_log_line += "];";
 
 	log4cpp::Category::getInstance(recat).notice(result_log_line);
+}
+
+int generate_rand_bytes(u_int8_t * buffer, size_t size)
+{
+	if(1 == RAND_bytes(buffer, size))
+		return 0;
+	else
+		return -1;
 }

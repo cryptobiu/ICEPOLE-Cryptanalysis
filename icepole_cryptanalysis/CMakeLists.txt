@@ -12,5 +12,6 @@ add_executable(icepole_cryptanalysis ${SOURCE_FILES})
 target_link_libraries( icepole_cryptanalysis
 	log4cpp
 	event
+	crypto
 	pthread
 )
