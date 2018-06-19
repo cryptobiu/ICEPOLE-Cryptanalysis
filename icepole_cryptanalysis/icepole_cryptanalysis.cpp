@@ -432,10 +432,13 @@ int generate_rand_bytes(u_int8_t * buffer, size_t size)
 
 int suitable_msg(u_int8_t * buffer, size_t size)
 {
+	/*
 	if(0 == rand()%101)
 		return 0;
 	else
 		return -1;
+		*/
+	return 0;
 }
 
 int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size)
