@@ -329,38 +329,46 @@ void cryptanalyser_round(const char * locat, const char * recat)
 			u_int8_t * m1 = rand_chunk + i * MSG_SIZE;
 			if(0 == suitable_msg(m1, MSG_SIZE))
 			{
+				log4cpp::Category::getInstance(locat).debug("%s: suitable_msg() success.", __FUNCTION__);
 				u_int8_t m2[MSG_SIZE];
 				if(0 == pair_msg(m1, m2, MSG_SIZE))
 				{
+					log4cpp::Category::getInstance(locat).debug("%s: pair_msg() success.", __FUNCTION__);
 					u_int8_t c1[MSG_SIZE];
 					size_t c1_size = 0;
 					if(0 == enc_(m1, MSG_SIZE, c1, &c1_size))
 					{
+						log4cpp::Category::getInstance(locat).debug("%s: enc_(m1) success.", __FUNCTION__);
 						u_int8_t c2[MSG_SIZE];
 						size_t c2_size = 0;
 						if(0 == enc_(m2, MSG_SIZE, c2, &c2_size))
 						{
+							log4cpp::Category::getInstance(locat).debug("%s: enc_(m2) success.", __FUNCTION__);
 							if(0 == test(c1, c1_size, c2, c2_size))
 							{
 								log_result(m1, m2, MSG_SIZE, c1, c1_size, c2, c2_size, recat);
 								__sync_fetch_and_add(&results, 1);
 							}
+							else
+								log4cpp::Category::getInstance(locat).debug("%s: test() failure.", __FUNCTION__);
 						}
 						else
-							log4cpp::Category::getInstance(locat).error("%s: enc_(m2) failed.", __FUNCTION__);
+							log4cpp::Category::getInstance(locat).error("%s: enc_(m2) failure.", __FUNCTION__);
 					}
 					else
-						log4cpp::Category::getInstance(locat).error("%s: enc_(m1) failed.", __FUNCTION__);
+						log4cpp::Category::getInstance(locat).error("%s: enc_(m1) failure.", __FUNCTION__);
 				}
 				else
-					log4cpp::Category::getInstance(locat).error("%s: pair_msg() failed.", __FUNCTION__);
+					log4cpp::Category::getInstance(locat).error("%s: pair_msg() failure.", __FUNCTION__);
 			}
 			else
-				log4cpp::Category::getInstance(locat).debug("%s: suitable_msg() failed.", __FUNCTION__);
+				log4cpp::Category::getInstance(locat).debug("%s: suitable_msg() failure.", __FUNCTION__);
+
+			__sync_fetch_and_add(&tests, MSGS_IN_CHUNK);
 		}
 	}
 	else
-		log4cpp::Category::getInstance(locat).error("%s: generate_rand_bytes() failed.", __FUNCTION__);
+		log4cpp::Category::getInstance(locat).error("%s: generate_rand_bytes() failure.", __FUNCTION__);
 
 }
 
