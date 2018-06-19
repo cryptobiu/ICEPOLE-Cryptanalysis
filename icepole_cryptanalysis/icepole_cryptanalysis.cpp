@@ -39,6 +39,8 @@ int main(int argc, char *argv[])
 	size_t thread_count = 1;
 	get_options(argc, argv, &log_level, &thread_count, &required_tests, &required_results);
 
+	srand(time(NULL)%1000);
+
 	mkdir("./logs", S_IRWXU | S_IRWXG | S_IRWXO);
 	init_log("icepole_cryptanalysis.log", "./logs", log_level, logcat);
 	mkdir("./results", S_IRWXU | S_IRWXG | S_IRWXO);
@@ -311,9 +313,11 @@ void * cryptanalyser(void * arg)
 int generate_rand_bytes(u_int8_t * buffer, size_t size);
 int suitable_msg(u_int8_t * buffer, size_t size);
 int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size);
-int enc_(const u_int8_t * m, u_int8_t * c, size_t size);
-int test(const u_int8_t * c1, const u_int8_t * c2, size_t size);
-void log_result(const u_int8_t * m1, const u_int8_t * m2, const u_int8_t * c1, const u_int8_t * c2, size_t size, const char * recat);
+int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size);
+int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const size_t c2_size);
+void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
+			    const u_int8_t * c1, const size_t c1_size,
+				const u_int8_t * c2, const size_t c2_size, const char * recat);
 
 void cryptanalyser_round(const char * locat, const char * recat)
 {
@@ -329,14 +333,16 @@ void cryptanalyser_round(const char * locat, const char * recat)
 				if(0 == pair_msg(m1, m2, MSG_SIZE))
 				{
 					u_int8_t c1[MSG_SIZE];
-					if(0 == enc_(m1, c1, MSG_SIZE))
+					size_t c1_size = 0;
+					if(0 == enc_(m1, MSG_SIZE, c1, &c1_size))
 					{
 						u_int8_t c2[MSG_SIZE];
-						if(0 == enc_(m2, c2, MSG_SIZE))
+						size_t c2_size = 0;
+						if(0 == enc_(m2, MSG_SIZE, c2, &c2_size))
 						{
-							if(0 == test(c1, c2, MSG_SIZE))
+							if(0 == test(c1, c1_size, c2, c2_size))
 							{
-								log_result(m1, m2, c1, c2, MSG_SIZE, recat);
+								log_result(m1, m2, MSG_SIZE, c1, c1_size, c2, c2_size, recat);
 								__sync_fetch_and_add(&results, 1);
 							}
 						}
@@ -358,32 +364,34 @@ void cryptanalyser_round(const char * locat, const char * recat)
 
 }
 
-void log_result(const u_int8_t * m1, const u_int8_t * m2, const u_int8_t * c1, const u_int8_t * c2, size_t size, const char * recat)
+void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
+	    		const u_int8_t * c1, const size_t c1_size,
+				const u_int8_t * c2, const size_t c2_size, const char * recat)
 {
 	std::string result_log_line = "result: ";
 	std::stringstream srs;
 
 	result_log_line += "m1=[";
 	srs << std::setfill('0') << std::hex;
-	for(size_t i = 0; i < size; ++i) srs << std::setw(2) << (int)m1[i];
+	for(size_t i = 0; i < m_size; ++i) srs << std::setw(2) << (int)m1[i];
 	result_log_line += srs.str();
 	result_log_line += "]; c1=[";
 
 	srs.str("");
 	srs << std::setfill('0') << std::hex;
-	for(size_t i = 0; i < size; ++i) srs << std::setw(2) << (int)c1[i];
+	for(size_t i = 0; i < c1_size; ++i) srs << std::setw(2) << (int)c1[i];
 	result_log_line += srs.str();
 	result_log_line += "]; m2=[";
 
 	srs.str("");
 	srs << std::setfill('0') << std::hex;
-	for(size_t i = 0; i < size; ++i) srs << std::setw(2) << (int)m2[i];
+	for(size_t i = 0; i < m_size; ++i) srs << std::setw(2) << (int)m2[i];
 	result_log_line += srs.str();
 	result_log_line += "]; c2=[";
 
 	srs.str("");
 	srs << std::setfill('0') << std::hex;
-	for(size_t i = 0; i < size; ++i) srs << std::setw(2) << (int)c2[i];
+	for(size_t i = 0; i < c2_size; ++i) srs << std::setw(2) << (int)c2[i];
 	result_log_line += srs.str();
 	result_log_line += "];";
 
@@ -396,4 +404,41 @@ int generate_rand_bytes(u_int8_t * buffer, size_t size)
 		return 0;
 	else
 		return -1;
+}
+
+int suitable_msg(u_int8_t * buffer, size_t size)
+{
+	if(0 == rand()%101)
+		return 0;
+	else
+		return -1;
+}
+
+int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size)
+{
+	memcpy(m2, m1, size);
+	m2[0] ^= 0x80;
+	return 0;
+}
+
+#include "icepole128av2/ref/encrypt.h"
+
+int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size)
+{
+	static const u_int8_t key[16] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+									  0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
+	unsigned long long ct_size = 0;
+	if(0 == crypto_aead_encrypt(c, &ct_size, m, m_size, NULL, 0, NULL, key, key))
+	{
+		*c_size = ct_size;
+		return 0;
+	}
+	return -1;
+}
+
+int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const size_t c2_size)
+{
+	if(c1_size == c2_size)
+		return memcmp(c1, c2, c1_size);
+	return -1;
 }
