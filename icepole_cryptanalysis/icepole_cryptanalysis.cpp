@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 void get_options(int argc, char *argv[], int * log_level, size_t * thread_count, unsigned int * required_tests, unsigned int * required_results)
 {
 	int opt;
-	while ((opt = getopt(argc, argv, "hl:t:")) != -1)
+	while ((opt = getopt(argc, argv, "hl:t:s:r:")) != -1)
 	{
 		switch (opt)
 		{
