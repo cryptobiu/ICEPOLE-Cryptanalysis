@@ -23,6 +23,8 @@
 
 #include <event2/event.h>
 
+#include "aes_prg.h"
+
 void get_options(int argc, char *argv[], int * log_level, size_t * thread_count, unsigned int * required_tests, unsigned int * required_results);
 void show_usage(const char * prog);
 void init_log(const char * a_log_file, const char * a_log_dir, const int log_level, const char * logcat);
@@ -32,6 +34,19 @@ static const char * logcat = "ca4ip.log";
 static const char * rescat = "ca4ip.res";
 unsigned int tests = 0, results = 0, required_tests = UINT_MAX, required_results = UINT_MAX;
 sem_t run_flag;
+
+#define MSG_SIZE 160
+#define MSGS_IN_CHUNK 8
+#define RAND_CHUNK_SIZE MSGS_IN_CHUNK*MSG_SIZE
+
+int generate_rand_bytes(u_int8_t * buffer, size_t size);
+int suitable_msg(u_int8_t * buffer, size_t size);
+int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size);
+int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size);
+int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const size_t c2_size);
+void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
+			    const u_int8_t * c1, const size_t c1_size,
+				const u_int8_t * c2, const size_t c2_size, const char * recat);
 
 int main(int argc, char *argv[])
 {
@@ -264,13 +279,18 @@ void timer_cb(evutil_socket_t, short, void * arg)
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: %u results reached; breaking event loop.", __FUNCTION__, current_result_count);
 		event_base_loopbreak((struct event_base *)arg);
+		return;
 	}
+
 	unsigned int current_test_count = __sync_fetch_and_add(&tests, 0);
 	if(current_test_count >= required_tests)
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: %u tests reached; breaking event loop.", __FUNCTION__, current_test_count);
 		event_base_loopbreak((struct event_base *)arg);
+		return;
 	}
+
+	log4cpp::Category::getInstance(logcat).notice("%s: %u tests performed; %u results collected.", __FUNCTION__, current_test_count, current_result_count);
 }
 
 void cryptanalyser_round(const char * locat, const char * recat);
@@ -290,6 +310,13 @@ void * cryptanalyser(void * arg)
 		exit(__LINE__);
 	}
 
+	aes_prg prg;
+	if(0 != prg.init(RAND_CHUNK_SIZE))
+	{
+		log4cpp::Category::getInstance(locat).error("%s: prg.init() failure", __FUNCTION__);
+		exit(__LINE__);
+	}
+
 	while(0 < run_flag_value)
 	{
 		cryptanalyser_round(locat, recat);
@@ -303,21 +330,10 @@ void * cryptanalyser(void * arg)
 		}
 	}
 
+	prg.term();
+
 	return NULL;
 }
-
-#define MSG_SIZE 160
-#define MSGS_IN_CHUNK 8
-#define RAND_CHUNK_SIZE MSGS_IN_CHUNK*MSG_SIZE
-
-int generate_rand_bytes(u_int8_t * buffer, size_t size);
-int suitable_msg(u_int8_t * buffer, size_t size);
-int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size);
-int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size);
-int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const size_t c2_size);
-void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
-			    const u_int8_t * c1, const size_t c1_size,
-				const u_int8_t * c2, const size_t c2_size, const char * recat);
 
 void cryptanalyser_round(const char * locat, const char * recat)
 {
@@ -446,7 +462,6 @@ int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size)
 
 int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const size_t c2_size)
 {
-	if(c1_size == c2_size)
-		return memcmp(c1, c2, c1_size);
-	return -1;
+	//the probability for a successful test is 1/256.
+	return (c1[0] == c2[0])? 0: -1;
 }

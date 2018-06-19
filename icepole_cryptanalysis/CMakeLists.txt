@@ -15,6 +15,7 @@ link_directories(
 )
 
 set(SOURCE_FILES
+	aes_prg.cpp
 	icepole_cryptanalysis.cpp
 )
 
