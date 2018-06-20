@@ -4,11 +4,16 @@ icepole_cryptanalysis/CMakeCache.txt
 icepole_cryptanalysis/CMakeFiles/
 icepole_cryptanalysis/Makefile
 icepole_cryptanalysis/cmake_install.cmake
+icepole_cryptanalysis/icepole_cryptanalysis
+icepole_cryptanalysis/logs/
+icepole_cryptanalysis/results/
 
 icepole/icepole128av2/ref/CMakeCache.txt
 icepole/icepole128av2/ref/CMakeFiles/
 icepole/icepole128av2/ref/Makefile
 icepole/icepole128av2/ref/cmake_install.cmake
 icepole/icepole128av2/ref/libicepole_128AV2.a
-icepole_cryptanalysis/icepole_cryptanalysis
+icepole/icepole128av2/ref/.cproject
+icepole/icepole128av2/ref/.project
+
 

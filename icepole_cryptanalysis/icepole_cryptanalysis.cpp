@@ -36,10 +36,9 @@ unsigned int tests = 0, results = 0, required_tests = UINT_MAX, required_results
 sem_t run_flag;
 
 #define MSG_SIZE 160
-#define MSGS_IN_CHUNK 8
+#define MSGS_IN_CHUNK 80
 #define RAND_CHUNK_SIZE MSGS_IN_CHUNK*MSG_SIZE
 
-int generate_rand_bytes(u_int8_t * buffer, size_t size);
 int suitable_msg(u_int8_t * buffer, size_t size);
 int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size);
 int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size);
@@ -274,7 +273,7 @@ void sigint_cb(evutil_socket_t, short, void * arg)
 
 void timer_cb(evutil_socket_t, short, void * arg)
 {
-	unsigned int current_result_count = __sync_fetch_and_add(&results, 0);
+	unsigned int current_result_count = __sync_add_and_fetch(&results, 0);
 	if(current_result_count >= required_results)
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: %u results reached; breaking event loop.", __FUNCTION__, current_result_count);
@@ -282,7 +281,7 @@ void timer_cb(evutil_socket_t, short, void * arg)
 		return;
 	}
 
-	unsigned int current_test_count = __sync_fetch_and_add(&tests, 0);
+	unsigned int current_test_count = __sync_add_and_fetch(&tests, 0);
 	if(current_test_count >= required_tests)
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: %u tests reached; breaking event loop.", __FUNCTION__, current_test_count);
@@ -290,10 +289,11 @@ void timer_cb(evutil_socket_t, short, void * arg)
 		return;
 	}
 
-	log4cpp::Category::getInstance(logcat).notice("%s: %u tests performed; %u results collected.", __FUNCTION__, current_test_count, current_result_count);
+	log4cpp::Category::getInstance(logcat).notice("%s: %u tests performed; %u results collected.",
+			__FUNCTION__, current_test_count, current_result_count);
 }
 
-void cryptanalyser_round(const char * locat, const char * recat);
+void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg);
 
 void * cryptanalyser(void * arg)
 {
@@ -319,7 +319,7 @@ void * cryptanalyser(void * arg)
 
 	while(0 < run_flag_value)
 	{
-		cryptanalyser_round(locat, recat);
+		cryptanalyser_round(locat, recat, prg);
 		if(0 != sem_getvalue(&run_flag, &run_flag_value))
 		{
 			int errcode = errno;
@@ -335,10 +335,10 @@ void * cryptanalyser(void * arg)
 	return NULL;
 }
 
-void cryptanalyser_round(const char * locat, const char * recat)
+void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg)
 {
 	u_int8_t rand_chunk[RAND_CHUNK_SIZE];
-	if(0 == generate_rand_bytes(rand_chunk, RAND_CHUNK_SIZE))
+	if(0 == prg.gen_rand_bytes(rand_chunk, RAND_CHUNK_SIZE))
 	{
 		for(size_t i = 0; i < MSGS_IN_CHUNK; i++)
 		{
@@ -367,6 +367,7 @@ void cryptanalyser_round(const char * locat, const char * recat)
 							}
 							else
 								log4cpp::Category::getInstance(locat).debug("%s: test() failure.", __FUNCTION__);
+
 						}
 						else
 							log4cpp::Category::getInstance(locat).error("%s: enc_(m2) failure.", __FUNCTION__);
@@ -380,11 +381,11 @@ void cryptanalyser_round(const char * locat, const char * recat)
 			else
 				log4cpp::Category::getInstance(locat).debug("%s: suitable_msg() failure.", __FUNCTION__);
 
-			__sync_fetch_and_add(&tests, MSGS_IN_CHUNK);
 		}
+		__sync_add_and_fetch(&tests, MSGS_IN_CHUNK);
 	}
 	else
-		log4cpp::Category::getInstance(locat).error("%s: generate_rand_bytes() failure.", __FUNCTION__);
+		log4cpp::Category::getInstance(locat).error("%s: prg.gen_rand_bytes() failure.", __FUNCTION__);
 
 }
 
@@ -422,14 +423,6 @@ void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
 	log4cpp::Category::getInstance(recat).notice(result_log_line);
 }
 
-int generate_rand_bytes(u_int8_t * buffer, size_t size)
-{
-	if(1 == RAND_bytes(buffer, size))
-		return 0;
-	else
-		return -1;
-}
-
 int suitable_msg(u_int8_t * buffer, size_t size)
 {
 	/*
@@ -452,6 +445,7 @@ int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size)
 
 int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size)
 {
+	/*
 	static const u_int8_t key[16] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
 									  0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
 	unsigned long long ct_size = 0;
@@ -461,6 +455,7 @@ int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size)
 		return 0;
 	}
 	return -1;
+	*/
 }
 
 int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const size_t c2_size)
