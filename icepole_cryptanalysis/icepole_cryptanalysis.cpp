@@ -25,10 +25,13 @@
 
 #include "aes_prg.h"
 
+#include "icepole128av2/ref/encrypt.h"
+
 void get_options(int argc, char *argv[], int * log_level, size_t * thread_count, unsigned int * required_tests, unsigned int * required_results);
 void show_usage(const char * prog);
 void init_log(const char * a_log_file, const char * a_log_dir, const int log_level, const char * logcat);
 void cryptanalysis(size_t thread_count);
+void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg, void * token);
 
 static const char * logcat = "ca4ip.log";
 static const char * rescat = "ca4ip.res";
@@ -41,7 +44,7 @@ sem_t run_flag;
 
 int suitable_msg(u_int8_t * buffer, size_t size);
 int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size);
-int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size);
+int enc_(void * token, const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size);
 int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const size_t c2_size);
 void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
 			    const u_int8_t * c1, const size_t c1_size,
@@ -293,8 +296,6 @@ void timer_cb(evutil_socket_t, short, void * arg)
 			__FUNCTION__, current_test_count, current_result_count);
 }
 
-void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg);
-
 void * cryptanalyser(void * arg)
 {
 	char locat[32], recat[32];
@@ -317,9 +318,14 @@ void * cryptanalyser(void * arg)
 		exit(__LINE__);
 	}
 
+	static const u_int8_t key[KSIZE] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+									  0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
+	void * token;
+	init_token(&token, key, key);
+
 	while(0 < run_flag_value)
 	{
-		cryptanalyser_round(locat, recat, prg);
+		cryptanalyser_round(locat, recat, prg, token);
 		if(0 != sem_getvalue(&run_flag, &run_flag_value))
 		{
 			int errcode = errno;
@@ -335,7 +341,7 @@ void * cryptanalyser(void * arg)
 	return NULL;
 }
 
-void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg)
+void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg, void * token)
 {
 	u_int8_t rand_chunk[RAND_CHUNK_SIZE];
 	if(0 == prg.gen_rand_bytes(rand_chunk, RAND_CHUNK_SIZE))
@@ -352,12 +358,12 @@ void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg)
 					log4cpp::Category::getInstance(locat).debug("%s: pair_msg() success.", __FUNCTION__);
 					u_int8_t c1[MSG_SIZE];
 					size_t c1_size = 0;
-					if(0 == enc_(m1, MSG_SIZE, c1, &c1_size))
+					if(0 == enc_(token, m1, MSG_SIZE, c1, &c1_size))
 					{
 						log4cpp::Category::getInstance(locat).debug("%s: enc_(m1) success.", __FUNCTION__);
 						u_int8_t c2[MSG_SIZE];
 						size_t c2_size = 0;
-						if(0 == enc_(m2, MSG_SIZE, c2, &c2_size))
+						if(0 == enc_(token, m2, MSG_SIZE, c2, &c2_size))
 						{
 							log4cpp::Category::getInstance(locat).debug("%s: enc_(m2) success.", __FUNCTION__);
 							if(0 == test(c1, c1_size, c2, c2_size))
@@ -393,26 +399,26 @@ void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
 	    		const u_int8_t * c1, const size_t c1_size,
 				const u_int8_t * c2, const size_t c2_size, const char * recat)
 {
-	std::string result_log_line = "result: ";
+	std::string result_log_line = "result:";
 	std::stringstream srs;
 
-	result_log_line += "m1=[";
+	result_log_line += "\nm1=[";
 	srs << std::setfill('0') << std::hex;
 	for(size_t i = 0; i < m_size; ++i) srs << std::setw(2) << (int)m1[i];
 	result_log_line += srs.str();
-	result_log_line += "]; c1=[";
+	result_log_line += "];\nc1=[";
 
 	srs.str("");
 	srs << std::setfill('0') << std::hex;
 	for(size_t i = 0; i < c1_size; ++i) srs << std::setw(2) << (int)c1[i];
 	result_log_line += srs.str();
-	result_log_line += "]; m2=[";
+	result_log_line += "];\nm2=[";
 
 	srs.str("");
 	srs << std::setfill('0') << std::hex;
 	for(size_t i = 0; i < m_size; ++i) srs << std::setw(2) << (int)m2[i];
 	result_log_line += srs.str();
-	result_log_line += "]; c2=[";
+	result_log_line += "];\nc2=[";
 
 	srs.str("");
 	srs << std::setfill('0') << std::hex;
@@ -431,7 +437,7 @@ int suitable_msg(u_int8_t * buffer, size_t size)
 	else
 		return -1;
 		*/
-	return 0;
+	return -1;
 }
 
 int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size)
@@ -441,25 +447,18 @@ int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size)
 	return 0;
 }
 
-#include "icepole128av2/ref/encrypt.h"
-
-int enc_(const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size)
+int enc_(void * token, const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size)
 {
-	/*
-	static const u_int8_t key[16] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-									  0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
 	unsigned long long ct_size = 0;
-	if(0 == crypto_aead_encrypt(c, &ct_size, m, m_size, NULL, 0, NULL, key, key))
+	if(0 == crypto_aead_encrypt_s(token, c, &ct_size, m, m_size, NULL, 0))
 	{
 		*c_size = ct_size;
 		return 0;
 	}
 	return -1;
-	*/
 }
 
 int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const size_t c2_size)
 {
-	//the probability for a successful test is 1/256.
-	return (c1[0] == c2[0])? 0: -1;
+	return -1;
 }

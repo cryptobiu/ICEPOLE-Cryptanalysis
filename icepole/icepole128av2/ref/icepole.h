@@ -49,5 +49,6 @@ void processDataBlockRev(
 void generateTag(
     ICESTATE S, 
     unsigned char * tag);
+
 #endif
 
