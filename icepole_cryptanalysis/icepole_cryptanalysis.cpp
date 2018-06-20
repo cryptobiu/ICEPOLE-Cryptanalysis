@@ -31,17 +31,19 @@ void get_options(int argc, char *argv[], int * log_level, size_t * thread_count,
 void show_usage(const char * prog);
 void init_log(const char * a_log_file, const char * a_log_dir, const int log_level, const char * logcat);
 void cryptanalysis(size_t thread_count);
-void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg, void * token);
+void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg);
 
 static const char * logcat = "ca4ip.log";
 static const char * rescat = "ca4ip.res";
 unsigned int tests = 0, results = 0, required_tests = UINT_MAX, required_results = UINT_MAX;
 sem_t run_flag;
 
-#define MSG_SIZE 160
-#define MSGS_IN_CHUNK 80
-#define RAND_CHUNK_SIZE MSGS_IN_CHUNK*MSG_SIZE
+#define BLOCKSIZE	128
 
+int generate_inputs(u_int8_t * P1, u_int8_t * P2, aes_prg & prg);
+int trace_inputs(const u_int8_t * P1, const u_int8_t * P2, const char * locat);
+
+/*
 int suitable_msg(u_int8_t * buffer, size_t size);
 int pair_msg(const u_int8_t * m1, u_int8_t * m2, size_t size);
 int enc_(void * token, const u_int8_t * m, const size_t m_size, u_int8_t * c, size_t * c_size);
@@ -49,6 +51,7 @@ int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const s
 void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
 			    const u_int8_t * c1, const size_t c1_size,
 				const u_int8_t * c2, const size_t c2_size, const char * recat);
+				*/
 
 int main(int argc, char *argv[])
 {
@@ -301,6 +304,14 @@ void * cryptanalyser(void * arg)
 	char locat[32], recat[32];
 	snprintf(locat, 32, "%s.%ld", logcat, (int64_t)arg);
 	snprintf(recat, 32, "%s.%ld", rescat, (int64_t)arg);
+
+	aes_prg prg;
+	if(0 != prg.init(BLOCKSIZE))
+	{
+		log4cpp::Category::getInstance(locat).error("%s: prg.init() failure", __FUNCTION__);
+		exit(__LINE__);
+	}
+
 	int run_flag_value;
 	if(0 != sem_getvalue(&run_flag, &run_flag_value))
 	{
@@ -311,21 +322,9 @@ void * cryptanalyser(void * arg)
 		exit(__LINE__);
 	}
 
-	aes_prg prg;
-	if(0 != prg.init(RAND_CHUNK_SIZE))
-	{
-		log4cpp::Category::getInstance(locat).error("%s: prg.init() failure", __FUNCTION__);
-		exit(__LINE__);
-	}
-
-	static const u_int8_t key[KSIZE] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-									  0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
-	void * token;
-	init_token(&token, key, key);
-
 	while(0 < run_flag_value)
 	{
-		cryptanalyser_round(locat, recat, prg, token);
+		cryptanalyser_round(locat, recat, prg);
 		if(0 != sem_getvalue(&run_flag, &run_flag_value))
 		{
 			int errcode = errno;
@@ -341,6 +340,97 @@ void * cryptanalyser(void * arg)
 	return NULL;
 }
 
+void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg)
+{
+	//*******************************************************************//
+	//generate P1 & P2
+	u_int8_t P1[2 * BLOCKSIZE], P2[2 * BLOCKSIZE];
+	generate_inputs(P1, P2, prg);
+	//if(log4cpp::Category::getInstance(locat).isPriorityEnabled(700))
+		trace_inputs(P1, P2, locat);
+
+}
+
+int generate_inputs(u_int8_t * P1, u_int8_t * P2, aes_prg & prg)
+{
+	prg.gen_rand_bytes(P1, BLOCKSIZE);
+	u_int64_t * p1u64 = (u_int64_t *)P1;
+
+	{//set 1st constraint
+		u_int64_t mask = 0x0000000000000010;
+		if(0 == ((p1u64[1] & mask) ^ (p1u64[4] & mask) ^ (p1u64[9] & mask) ^ (p1u64[12] & mask) ^ (p1u64[14] & mask)))
+			p1u64[14] ^= mask;
+	}
+
+	{//set 2nd constraint
+		u_int64_t mask = 0x0000000800000000;
+		if(0 == ((p1u64[1] & mask) ^ (p1u64[4] & mask) ^ (p1u64[9] & mask) ^ (p1u64[12] & mask) ^ (p1u64[14] & mask)))
+			p1u64[14] ^= mask;
+	}
+
+	{//set 3rd constraint
+		u_int64_t mask = 0x0000000200000000;
+		if(1 == ((p1u64[2] & mask) ^ (p1u64[7] & mask) ^ (p1u64[11] & mask) ^ (p1u64[15] & mask)))
+			p1u64[15] ^= mask;
+	}
+
+	{//set 3rd constraint
+		u_int64_t mask = 0x0000000000000001;
+		if(1 == ((p1u64[2] & mask) ^ (p1u64[7] & mask) ^ (p1u64[11] & mask) ^ (p1u64[15] & mask)))
+			p1u64[15] ^= mask;
+	}
+
+	memset(P1 + BLOCKSIZE, 0, BLOCKSIZE);
+
+	memcpy(P2, P1, BLOCKSIZE);
+	u_int64_t * p2u64 = (u_int64_t *)P2;
+	p2u64[2] = p1u64[2] ^ 0x1;
+	p2u64[4] = p1u64[4] ^ 0x1;
+	p2u64[5] = p1u64[5] ^ 0x1;
+	p2u64[6] = p1u64[6] ^ 0x1;
+	p2u64[7] = p1u64[7] ^ 0x1;
+	p2u64[9] = p1u64[9] ^ 0x1;
+	p2u64[11] = p1u64[11] ^ 0x1;
+	p2u64[12] = p1u64[12] ^ 0x1;
+	p2u64[14] = p1u64[14] ^ 0x1;
+
+	memset(P2 + BLOCKSIZE, 0, BLOCKSIZE);
+}
+
+int trace_inputs(const u_int8_t * P1, const u_int8_t * P2, const char * locat)
+{
+	u_int64_t * p1u64 = (u_int64_t *)P1;
+	u_int64_t * p2u64 = (u_int64_t *)P2;
+	char buffer[32];
+
+	std::string str = "inputs:\n";
+
+	str += "P1=\n";
+	for(size_t i = 0; i < 4; i++)
+	{
+		for(size_t j = 0; j < 4; j++)
+		{
+			snprintf(buffer, 32, "0x%016lX, ", p1u64[4*i+j]);
+			str += buffer;
+		}
+		str += "0x0000000000000000\n";
+	}
+
+	str += "P2=\n";
+	for(size_t i = 0; i < 4; i++)
+	{
+		for(size_t j = 0; j < 4; j++)
+		{
+			snprintf(buffer, 32, "0x%016lX, ", p2u64[4*i+j]);
+			str += buffer;
+		}
+		str += "0x0000000000000000\n";
+	}
+
+	log4cpp::Category::getInstance(locat).debug(str.c_str());
+}
+
+/*
 void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg, void * token)
 {
 	u_int8_t rand_chunk[RAND_CHUNK_SIZE];
@@ -431,12 +521,6 @@ void log_result(const u_int8_t * m1, const u_int8_t * m2, const size_t m_size,
 
 int suitable_msg(u_int8_t * buffer, size_t size)
 {
-	/*
-	if(0 == rand()%101)
-		return 0;
-	else
-		return -1;
-		*/
 	return -1;
 }
 
@@ -462,3 +546,4 @@ int test(const u_int8_t * c1, const size_t c1_size, const u_int8_t * c2, const s
 {
 	return -1;
 }
+*/
