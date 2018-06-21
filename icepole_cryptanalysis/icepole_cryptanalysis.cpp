@@ -34,13 +34,6 @@ void init_log(const char * a_log_file, const char * a_log_dir, const int log_lev
 u_int64_t left_rotate(u_int64_t v, size_t r);
 void cryptanalysis();
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3);
-int attack_u2(const u_int8_t * key, const u_int8_t * iv, u_int64_t & U2);
-int attack_u1(const u_int8_t * key, const u_int8_t * iv, u_int64_t & U1);
-
-
-void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg);
-int generate_inputs(u_int8_t * P1, u_int8_t * P2, aes_prg & prg);
-int trace_inputs(const u_int8_t * P1, const u_int8_t * P2, const char * locat);
 
 static const char * logcat = "ca4ip.log";
 
@@ -218,92 +211,6 @@ void * cryptanalyser(void * arg)
 */
 
 /*
-void cryptanalyser_round(const char * locat, const char * recat, aes_prg & prg)
-{
-	//generate P1 & P2
-	u_int8_t P1[2 * BLOCKSIZE], P2[2 * BLOCKSIZE];
-	generate_inputs(P1, P2, prg);
-	if(log4cpp::Category::getInstance(locat).isPriorityEnabled(700))
-		trace_inputs(P1, P2, locat);
 
-}
 
-int generate_inputs(u_int8_t * P1, u_int8_t * P2, aes_prg & prg)
-{
-	prg.gen_rand_bytes(P1, BLOCKSIZE);
-	u_int64_t * p1u64 = (u_int64_t *)P1;
-
-	{//set 1st constraint
-		u_int64_t mask = 0x0000000000000010;
-		if(0 == ((p1u64[1] & mask) ^ (p1u64[4] & mask) ^ (p1u64[9] & mask) ^ (p1u64[12] & mask) ^ (p1u64[14] & mask)))
-			p1u64[14] ^= mask;
-	}
-
-	{//set 2nd constraint
-		u_int64_t mask = 0x0000000800000000;
-		if(0 == ((p1u64[1] & mask) ^ (p1u64[4] & mask) ^ (p1u64[9] & mask) ^ (p1u64[12] & mask) ^ (p1u64[14] & mask)))
-			p1u64[14] ^= mask;
-	}
-
-	{//set 3rd constraint
-		u_int64_t mask = 0x0000000200000000;
-		if(1 == ((p1u64[2] & mask) ^ (p1u64[7] & mask) ^ (p1u64[11] & mask) ^ (p1u64[15] & mask)))
-			p1u64[15] ^= mask;
-	}
-
-	{//set 3rd constraint
-		u_int64_t mask = 0x0000000000000001;
-		if(1 == ((p1u64[2] & mask) ^ (p1u64[7] & mask) ^ (p1u64[11] & mask) ^ (p1u64[15] & mask)))
-			p1u64[15] ^= mask;
-	}
-
-	memset(P1 + BLOCKSIZE, 0, BLOCKSIZE);
-
-	memcpy(P2, P1, BLOCKSIZE);
-	u_int64_t * p2u64 = (u_int64_t *)P2;
-	p2u64[2] = p1u64[2] ^ 0x1;
-	p2u64[4] = p1u64[4] ^ 0x1;
-	p2u64[5] = p1u64[5] ^ 0x1;
-	p2u64[6] = p1u64[6] ^ 0x1;
-	p2u64[7] = p1u64[7] ^ 0x1;
-	p2u64[9] = p1u64[9] ^ 0x1;
-	p2u64[11] = p1u64[11] ^ 0x1;
-	p2u64[12] = p1u64[12] ^ 0x1;
-	p2u64[14] = p1u64[14] ^ 0x1;
-
-	memset(P2 + BLOCKSIZE, 0, BLOCKSIZE);
-}
-
-int trace_inputs(const u_int8_t * P1, const u_int8_t * P2, const char * locat)
-{
-	u_int64_t * p1u64 = (u_int64_t *)P1;
-	u_int64_t * p2u64 = (u_int64_t *)P2;
-	char buffer[32];
-
-	std::string str = "inputs:\n";
-
-	str += "P1=\n";
-	for(size_t i = 0; i < 4; i++)
-	{
-		for(size_t j = 0; j < 4; j++)
-		{
-			snprintf(buffer, 32, "0x%016lX, ", p1u64[4*i+j]);
-			str += buffer;
-		}
-		str += "0x0000000000000000\n";
-	}
-
-	str += "P2=\n";
-	for(size_t i = 0; i < 4; i++)
-	{
-		for(size_t j = 0; j < 4; j++)
-		{
-			snprintf(buffer, 32, "0x%016lX, ", p2u64[4*i+j]);
-			str += buffer;
-		}
-		str += "0x0000000000000000\n";
-	}
-
-	log4cpp::Category::getInstance(locat).debug(str.c_str());
-}
 */

@@ -15,45 +15,16 @@
 void sigint_cb(evutil_socket_t, short, void *);
 void timer_cb(evutil_socket_t, short, void *);
 void * u03_attacker(void *);
+int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id);
+int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat);
 
 #define KEYSIZE		16
 #define BLOCKSIZE	128
+#define BLONGSIZE	16
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_P1_1st_constraint_base[16] =
-{
-	0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000010, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000010, 0x0000000000000000, 0x0000000000000010, 0x0000000000000000, //0x0000000000000000,
-};
-
-const u_int64_t u03_P1_2nd_constraint_base[16] =
-{
-	0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000800000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000800000000, 0x0000000000000000, 0x0000000800000000, 0x0000000000000000, //0x0000000000000000,
-};
-
-const u_int64_t u03_P1_3rd_constraint_base[16] =
-{
-	0x0000000000000000, 0x0000000000000000, 0x0000000200000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
-};
-
-const u_int64_t u03_P1_4th_constraint_base[16] =
-{
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000001, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
-};
-
-const u_int64_t u03_ceiling_pow_2_33p9 = 16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 10;//16029384739;
 
 typedef struct
 {
@@ -108,8 +79,8 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 					{
 						log4cpp::Category::getInstance(locat).debug("%s: the timer event was created.", __FUNCTION__);
 
-						struct timeval tensec = {10,0};
-						if(0 == event_add(timer_evt, &tensec))
+						struct timeval twosec = {2,0};
+						if(0 == event_add(timer_evt, &twosec))
 						{
 							log4cpp::Category::getInstance(locat).debug("%s: the timer event was added.", __FUNCTION__);
 
@@ -221,11 +192,20 @@ void sigint_cb(evutil_socket_t, short, void * arg)
 
 void timer_cb(evutil_socket_t, short, void * arg)
 {
+	bool all_samples_done = true;
 	event_param_t * eprm = (event_param_t *)arg;
 	for(size_t i = 0; i < u03_thread_count; ++i)
 	{
 		u_int64_t samples_done = __sync_add_and_fetch(eprm->samples_done + i, 0);
 		log4cpp::Category::getInstance(eprm->locat).notice("%s: thread %lu smaples done = %lu.", __FUNCTION__, i, samples_done);
+
+		all_samples_done = all_samples_done && (samples_done >= u03_ceiling_pow_2_33p9);
+	}
+
+	if(all_samples_done)
+	{
+		log4cpp::Category::getInstance(eprm->locat).notice("%s: all samples are done for all threads; breaking event loop.", __FUNCTION__);
+		event_base_loopbreak(eprm->the_base);
 	}
 }
 
@@ -257,6 +237,11 @@ void * u03_attacker(void * arg)
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
 	{
+		u_int64_t P1[2 * BLONGSIZE], P2[2 * BLONGSIZE];
+		generate_inputs(P1, P2, prg, prm->id);
+		if(log4cpp::Category::getInstance(prm->locat).isPriorityEnabled(700))
+			trace_inputs(P1, P2, prm->locat.c_str());
+
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
@@ -269,4 +254,113 @@ void * u03_attacker(void * arg)
 		}
 	}
 	return NULL;
+}
+
+/*
+const u_int64_t u03_P1_1st_constraint_base[16] =
+{
+	0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000000000010, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000000000010, 0x0000000000000000, 0x0000000000000010, 0x0000000000000000, //0x0000000000000000,
+};
+
+const u_int64_t u03_P1_2nd_constraint_base[16] =
+{
+	0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000800000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000800000000, 0x0000000000000000, 0x0000000800000000, 0x0000000000000000, //0x0000000000000000,
+};
+
+const u_int64_t u03_P1_3rd_constraint_base[16] =
+{
+	0x0000000000000000, 0x0000000000000000, 0x0000000200000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
+};
+
+const u_int64_t u03_P1_4th_constraint_base[16] =
+{
+	0x0000000000000000, 0x0000000000000000, 0x0000000000000001, 0x0000000000000000, //0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
+};
+*/
+
+int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id)
+{
+	prg.gen_rand_bytes((u_int8_t *)P1, BLOCKSIZE);
+
+	{//set 1st constraint
+		u_int64_t mask = 0x0000000000000010;
+		if(0 == ((P1[1] & mask) ^ (P1[4] & mask) ^ (P1[9] & mask) ^ (P1[12] & mask) ^ (P1[14] & mask)))
+			P1[14] ^= mask;
+	}
+
+	{//set 2nd constraint
+		u_int64_t mask = 0x0000000800000000;
+		if(0 == ((P1[1] & mask) ^ (P1[4] & mask) ^ (P1[9] & mask) ^ (P1[12] & mask) ^ (P1[14] & mask)))
+			P1[14] ^= mask;
+	}
+
+	{//set 3rd constraint
+		u_int64_t mask = 0x0000000200000000;
+		if(1 == ((P1[2] & mask) ^ (P1[7] & mask) ^ (P1[11] & mask) ^ (P1[15] & mask)))
+			P1[15] ^= mask;
+	}
+
+	{//set 3rd constraint
+		u_int64_t mask = 0x0000000000000001;
+		if(1 == ((P1[2] & mask) ^ (P1[7] & mask) ^ (P1[11] & mask) ^ (P1[15] & mask)))
+			P1[15] ^= mask;
+	}
+
+	memset((u_int8_t *)P1 + BLOCKSIZE, 0, BLOCKSIZE);
+
+	memcpy(P2, P1, BLOCKSIZE);
+	P2[2]  = P1[2]  ^ 0x1;
+	P2[4]  = P1[4]  ^ 0x1;
+	P2[5]  = P1[5]  ^ 0x1;
+	P2[6]  = P1[6]  ^ 0x1;
+	P2[7]  = P1[7]  ^ 0x1;
+	P2[9]  = P1[9]  ^ 0x1;
+	P2[11] = P1[11] ^ 0x1;
+	P2[12] = P1[12] ^ 0x1;
+	P2[14] = P1[14] ^ 0x1;
+
+	memset((u_int8_t *)P2 + BLOCKSIZE, 0, BLOCKSIZE);
+}
+
+int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat)
+{
+	char buffer[32];
+
+	std::string str = "inputs:\n";
+
+	str += "P1=\n";
+	for(size_t i = 0; i < 4; i++)
+	{
+		for(size_t j = 0; j < 4; j++)
+		{
+			snprintf(buffer, 32, "0x%016lX, ", P1[4*i+j]);
+			str += buffer;
+		}
+		str += "0x0000000000000000\n";
+	}
+
+	str += "P2=\n";
+	for(size_t i = 0; i < 4; i++)
+	{
+		for(size_t j = 0; j < 4; j++)
+		{
+			snprintf(buffer, 32, "0x%016lX, ", P2[4*i+j]);
+			str += buffer;
+		}
+		str += "0x0000000000000000\n";
+	}
+
+	log4cpp::Category::getInstance(locat).debug(str.c_str());
 }
