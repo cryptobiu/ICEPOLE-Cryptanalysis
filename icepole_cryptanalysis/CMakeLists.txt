@@ -17,6 +17,7 @@ link_directories(
 set(SOURCE_FILES
 	aes_prg.cpp
 	icepole_cryptanalysis.cpp
+	u03_attack.cpp
 )
 
 add_executable(icepole_cryptanalysis ${SOURCE_FILES})
