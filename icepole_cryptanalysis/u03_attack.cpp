@@ -11,20 +11,7 @@
 #include <log4cpp/Category.hh>
 
 #include "aes_prg.h"
-
-void sigint_cb(evutil_socket_t, short, void *);
-void timer_cb(evutil_socket_t, short, void *);
-void * u03_attacker(void *);
-int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id);
-int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat);
-
-#define KEYSIZE		16
-#define BLOCKSIZE	128
-#define BLONGSIZE	16
-
-const size_t u03_thread_count = 64;
-
-const u_int64_t u03_ceiling_pow_2_33p9 = 10;//16029384739;
+#include "icepole128av2/ref/encrypt.h"
 
 typedef struct
 {
@@ -33,7 +20,24 @@ typedef struct
 	sem_t * run_flag;
 	u_int64_t * U0, * U3;
 	u_int64_t * samples_done;
+	u_int8_t * key, * iv;
 }u03_attacker_t;
+
+void sigint_cb(evutil_socket_t, short, void *);
+void timer_cb(evutil_socket_t, short, void *);
+void * u03_attacker(void *);
+int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id);
+int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat);
+u_int64_t left_rotate(u_int64_t v, size_t r);
+
+#define KEY_SIZE			16
+#define BLOCK_SIZE			128
+#define BLONG_SIZE			16
+#define ICEPOLE_TAG_SIZE	16
+
+const size_t u03_thread_count = 64;
+
+const u_int64_t u03_ceiling_pow_2_33p9 = 10;//16029384739;
 
 typedef struct
 {
@@ -95,6 +99,8 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].U0 = &U0;
 								atckr_prms[i].U3 = &U3;
 								atckr_prms[i].samples_done = samples_done + i;
+								atckr_prms[i].key = (u_int8_t *)key;
+								atckr_prms[i].iv = (u_int8_t *)iv;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -218,7 +224,7 @@ void * u03_attacker(void * arg)
 	prm->locat = atckr_locat;
 
 	aes_prg prg;
-	if(0 != prg.init(BLOCKSIZE))
+	if(0 != prg.init(BLOCK_SIZE))
 	{
 		log4cpp::Category::getInstance(prm->locat).error("%s: prg.init() failure", __FUNCTION__);
 		return NULL;
@@ -237,10 +243,23 @@ void * u03_attacker(void * arg)
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
 	{
-		u_int64_t P1[2 * BLONGSIZE], P2[2 * BLONGSIZE];
+		u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
 		generate_inputs(P1, P2, prg, prm->id);
-		if(log4cpp::Category::getInstance(prm->locat).isPriorityEnabled(700))
-			trace_inputs(P1, P2, prm->locat.c_str());
+
+		//if(log4cpp::Category::getInstance(prm->locat).isPriorityEnabled(700))
+			//trace_inputs(P1, P2, prm->locat.c_str());
+
+		u_int8_t tc1[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE], tc2[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE];
+		u_int64_t * C1 = (u_int64_t *)tc1, * C2 = (u_int64_t *)tc2;
+		unsigned long long clen;
+
+		crypto_aead_encrypt((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
+		crypto_aead_encrypt((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
+
+		if(log4cpp::Category::getInstance(prm->locat).isDebugEnabled())
+		{
+			log4cpp::Category::getInstance(prm->locat).debug("%s: plaintext size = %lu; cyphertext size = %lu;", __FUNCTION__, 2*BLOCK_SIZE, clen);
+		}
 
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
@@ -292,7 +311,7 @@ const u_int64_t u03_P1_4th_constraint_base[16] =
 
 int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id)
 {
-	prg.gen_rand_bytes((u_int8_t *)P1, BLOCKSIZE);
+	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
 
 	{//set 1st constraint
 		u_int64_t mask = 0x0000000000000010;
@@ -318,9 +337,9 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 			P1[15] ^= mask;
 	}
 
-	memset((u_int8_t *)P1 + BLOCKSIZE, 0, BLOCKSIZE);
+	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
 
-	memcpy(P2, P1, BLOCKSIZE);
+	memcpy(P2, P1, BLOCK_SIZE);
 	P2[2]  = P1[2]  ^ 0x1;
 	P2[4]  = P1[4]  ^ 0x1;
 	P2[5]  = P1[5]  ^ 0x1;
@@ -331,7 +350,13 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 	P2[12] = P1[12] ^ 0x1;
 	P2[14] = P1[14] ^ 0x1;
 
-	memset((u_int8_t *)P2 + BLOCKSIZE, 0, BLOCKSIZE);
+	memset((u_int8_t *)P2 + BLOCK_SIZE, 0, BLOCK_SIZE);
+
+	for(size_t i = 0; i < BLONG_SIZE; ++i)
+	{
+		P1[i] = left_rotate(P1[i], id);
+		P2[i] = left_rotate(P2[i], id);
+	}
 }
 
 int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat)
@@ -364,3 +389,10 @@ int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat)
 
 	log4cpp::Category::getInstance(locat).debug(str.c_str());
 }
+
+u_int64_t left_rotate(u_int64_t v, size_t r)
+{
+	r = r % 64;
+	return (v << r) | (v >> (64-r));
+}
+

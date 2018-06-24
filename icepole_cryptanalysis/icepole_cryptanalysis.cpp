@@ -113,12 +113,6 @@ void init_log(const char * a_log_file, const char * a_log_dir, const int log_lev
     log4cpp::Category::getInstance(logcat).notice("log start");
 }
 
-u_int64_t left_rotate(u_int64_t v, size_t r)
-{
-	r = r % 64;
-	return (v << r) | (v >> (64-r));
-}
-
 void cryptanalysis()
 {
 	static const u_int8_t key[KEYSIZE] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
