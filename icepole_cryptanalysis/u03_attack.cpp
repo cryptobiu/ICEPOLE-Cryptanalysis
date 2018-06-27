@@ -13,6 +13,8 @@
 #include "aes_prg.h"
 #include "icepole128av2/ref/encrypt.h"
 
+#define RC2I(arr,x,y) arr[x + 4*y]
+
 typedef struct
 {
 	size_t id;
@@ -256,10 +258,37 @@ void * u03_attacker(void * arg)
 		crypto_aead_encrypt((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
 		crypto_aead_encrypt((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
 
-		if(log4cpp::Category::getInstance(prm->locat).isDebugEnabled())
-		{
-			log4cpp::Category::getInstance(prm->locat).debug("%s: plaintext size = %lu; cyphertext size = %lu;", __FUNCTION__, 2*BLOCK_SIZE, clen);
-		}
+		/* For each P:
+		 *
+		 * 			XOR the 2nd block of P with the 2nd C block to get the output of [P6] permutation.
+		 *
+		 * 			XOR with the Kappa constant to undo the Kappa last step in [P6]
+		 *
+		 * 			For each bit in the mask in section 3, we need to get the the respective values
+		 * 			of all bits in the same row in the last-S output, and lookup using the table on p.2.
+		 * 			If we don't get the value for the target bit before the last-S the filter fails (move on).
+		 *
+		 * 			If we get the value of all target bits, calculate their XOR call it F1/F2.
+		 *
+		 * 	Apply pie & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
+		 *
+		 * 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
+		 *
+		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
+		 *
+		 * 	!!! For all of the above: apply shift-left by ID for everything !!!
+		 *
+		 * 	Once this is done for 2^33.9 samples, check for which counter pair the deviation from 0.5 is greatest:
+		 * 	divide counter-2[v0,v1] by counter-1[v0,v1] and abs ( sub 0.5 ). get the (v0,v1) of the counter with max result.
+		 *
+		 * 	Collect the ID, v0 and v1 for all thread and rejoin.
+		 *
+		 * 	Now it is possible to execute step 4 of the guesswork to calculate all bits of U0 and U3
+		 *
+		 */
+
+		//if(log4cpp::Category::getInstance(prm->locat).isDebugEnabled())
+			//log4cpp::Category::getInstance(prm->locat).debug("%s: plaintext size = %lu; cyphertext size = %lu;", __FUNCTION__, 2*BLOCK_SIZE, clen);
 
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
@@ -275,80 +304,109 @@ void * u03_attacker(void * arg)
 	return NULL;
 }
 
-/*
-const u_int64_t u03_P1_1st_constraint_base[16] =
-{
-	0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000010, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000010, 0x0000000000000000, 0x0000000000000010, 0x0000000000000000, //0x0000000000000000,
-};
-
-const u_int64_t u03_P1_2nd_constraint_base[16] =
-{
-	0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000800000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000800000000, 0x0000000000000000, 0x0000000800000000, 0x0000000000000000, //0x0000000000000000,
-};
-
-const u_int64_t u03_P1_3rd_constraint_base[16] =
-{
-	0x0000000000000000, 0x0000000000000000, 0x0000000200000000, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
-};
-
-const u_int64_t u03_P1_4th_constraint_base[16] =
-{
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000001, 0x0000000000000000, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
-	0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
-};
-*/
-
 int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id)
 {
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
 
-	{//set 1st constraint
+	{	//set 1st constraint
+		/*
+		const u_int64_t u03_P1_1st_constraint[16] =
+		{
+			0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+			0x0000000000000010, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+			0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+			0x0000000000000010, 0x0000000000000000, 0x0000000000000010, 0x0000000000000000, //0x0000000000000000,
+		};
+		*/
 		u_int64_t mask = 0x0000000000000010;
-		if(0 == ((P1[1] & mask) ^ (P1[4] & mask) ^ (P1[9] & mask) ^ (P1[12] & mask) ^ (P1[14] & mask)))
-			P1[14] ^= mask;
+		if (0 == (
+					(RC2I(P1,0,1) & mask) ^
+					(RC2I(P1,1,0) & mask) ^
+					(RC2I(P1,2,1) & mask) ^
+					(RC2I(P1,3,0) & mask) ^
+					(RC2I(P1,3,2) & mask)))
+		RC2I(P1,3,2) ^= mask;
 	}
 
-	{//set 2nd constraint
+	{	//set 2nd constraint
+		/*
+		const u_int64_t u03_P1_2nd_constraint[16] =
+		{
+			0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+			0x0000000800000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+			0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+			0x0000000800000000, 0x0000000000000000, 0x0000000800000000, 0x0000000000000000, //0x0000000000000000,
+		};
+		*/
 		u_int64_t mask = 0x0000000800000000;
-		if(0 == ((P1[1] & mask) ^ (P1[4] & mask) ^ (P1[9] & mask) ^ (P1[12] & mask) ^ (P1[14] & mask)))
-			P1[14] ^= mask;
+		if(0 == (
+					(RC2I(P1,0,1) & mask) ^
+					(RC2I(P1,1,0) & mask) ^
+					(RC2I(P1,2,1) & mask) ^
+					(RC2I(P1,3,0) & mask) ^
+					(RC2I(P1,3,2) & mask)))
+			RC2I(P1,3,2) ^= mask;
 	}
 
-	{//set 3rd constraint
+	{	//set 3rd constraint
+		/*
+		const u_int64_t u03_P1_3rd_constraint[16] =
+		{
+			0x0000000000000000, 0x0000000000000000, 0x0000000200000000, 0x0000000000000000, //0x0000000000000000,
+			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
+			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
+			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
+		};
+		*/
 		u_int64_t mask = 0x0000000200000000;
-		if(1 == ((P1[2] & mask) ^ (P1[7] & mask) ^ (P1[11] & mask) ^ (P1[15] & mask)))
-			P1[15] ^= mask;
+		if(1 == (
+					(RC2I(P1,0,2) & mask) ^
+					(RC2I(P1,1,3) & mask) ^
+					(RC2I(P1,2,3) & mask) ^
+					(RC2I(P1,3,3) & mask)))
+			RC2I(P1,3,3) ^= mask;
 	}
 
-	{//set 3rd constraint
+	{	//set 3rd constraint
+		/*
+		const u_int64_t u03_P1_4th_constraint[16] =
+		{
+			0x0000000000000000, 0x0000000000000000, 0x0000000000000001, 0x0000000000000000, //0x0000000000000000,
+			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
+			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
+			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
+		};
+		 */
 		u_int64_t mask = 0x0000000000000001;
-		if(1 == ((P1[2] & mask) ^ (P1[7] & mask) ^ (P1[11] & mask) ^ (P1[15] & mask)))
-			P1[15] ^= mask;
+		if(1 == (
+					(RC2I(P1,0,2) & mask) ^
+					(RC2I(P1,1,3) & mask) ^
+					(RC2I(P1,2,3) & mask) ^
+					(RC2I(P1,3,3) & mask)))
+			RC2I(P1,3,3) ^= mask;
 	}
 
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
 
+	/*
+	const u_int64_t u03_P1_P2_conversion[16] =
+	{
+		0x0, 0x0, 0x1, 0x0, //0x0,
+		0x1, 0x1, 0x1, 0x1, //0x0,
+		0x0, 0x1, 0x0, 0x1, //0x0,
+		0x1, 0x0, 0x1, 0x0, //0x0,
+	};
+	*/
 	memcpy(P2, P1, BLOCK_SIZE);
-	P2[2]  = P1[2]  ^ 0x1;
-	P2[4]  = P1[4]  ^ 0x1;
-	P2[5]  = P1[5]  ^ 0x1;
-	P2[6]  = P1[6]  ^ 0x1;
-	P2[7]  = P1[7]  ^ 0x1;
-	P2[9]  = P1[9]  ^ 0x1;
-	P2[11] = P1[11] ^ 0x1;
-	P2[12] = P1[12] ^ 0x1;
-	P2[14] = P1[14] ^ 0x1;
+	RC2I(P2,0,2) ^= 0x1;
+	RC2I(P2,1,0) ^= 0x1;
+	RC2I(P2,1,1) ^= 0x1;
+	RC2I(P2,1,2) ^= 0x1;
+	RC2I(P2,1,3) ^= 0x1;
+	RC2I(P2,2,1) ^= 0x1;
+	RC2I(P2,2,3) ^= 0x1;
+	RC2I(P2,3,0) ^= 0x1;
+	RC2I(P2,3,2) ^= 0x1;
 
 	memset((u_int8_t *)P2 + BLOCK_SIZE, 0, BLOCK_SIZE);
 
