@@ -33,6 +33,11 @@ int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat)
 u_int64_t left_rotate(u_int64_t v, size_t r);
 int encrypt_input(const u_int64_t * P, u_int64_t * C, u03_attacker_t * prm);
 int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
+void undo_last_perm_kappa(u_int64_t * P_perm_output);
+bool last_S_lookup_filter(u_int64_t * P_perm_output, u_int8_t F_xor_res);
+u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
+u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
+bool lookup_S_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -260,10 +265,15 @@ void * u03_attacker(void * arg)
 		get_perm_output(P2, C2, P2_perm_output);
 
 		//XOR with the Kappa constant to undo the Kappa last step in [P6]
-		static const u_int8_t k_constant_r5_bytes[] = { 0x00, 0x04, 0x8D, 0x15, 0xFE, 0x26, 0xAF, 0x37 };
-		u_int64_t * k_constant_r5 = (u_int64_t *)k_constant_r5_bytes;
-		P1_perm_output[0] ^= *k_constant_r5;
-		P2_perm_output[0] ^= *k_constant_r5;
+		undo_last_perm_kappa(P1_perm_output);
+		undo_last_perm_kappa(P2_perm_output);
+
+		u_int8_t F1 = 0, F2 = 0;
+		if(!last_S_lookup_filter(P1_perm_output, F1))
+			continue;
+		if(!last_S_lookup_filter(P2_perm_output, F2))
+			continue;
+
 
 		/* For each P:
 		 *
@@ -483,4 +493,197 @@ int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm
 		}
 	}
 	return 0;
+}
+
+void undo_last_perm_kappa(u_int64_t * P_perm_output)
+{
+	static const u_int8_t k_constant_r5_bytes[] = { 0x00, 0x04, 0x8D, 0x15, 0xFE, 0x26, 0xAF, 0x37 };
+	u_int64_t * k_constant_r5 = (u_int64_t *)k_constant_r5_bytes;	// = 0x37AF26FE158D0400
+	P_perm_output[0] ^= *k_constant_r5;
+}
+
+bool last_S_lookup_filter(u_int64_t * P_perm_output, u_int8_t F_xor_res)
+{
+	/*
+	const u_int64_t omega_mask[16] =
+	{
+		0x0008000000000000, 0x0000000200000000, 0x0000000000000000, 0x0000000000001000, //0x0000000000000000,
+		0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+		0x0000000000000000, 0x0040000000000000, 0x0000000040000000, 0x0000000000000000, //0x0000000000000000,
+		0x0000000000000000, 0x0000000000000000, 0x0000000000000400, 0x0000000002000000, //0x0000000000000000,
+	};
+	[0][0][51]
+	[0][1][33]
+	[0][3][12]
+	[1][1][35]
+	[2][1][54]
+	[2][2][30]
+	[3][2][10]
+	[3][3][25]
+	 */
+
+	//[0][0][51]
+	u_int8_t row_bits = get_row_bits(P_perm_output, 0, 51), input_bit = 0;
+	if(lookup_S_input_bit(row_bits, 0, input_bit))
+	{
+#error 'here'
+	}
+}
+
+u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z)
+{
+	size_t _z = z%64;
+	if(P[x + 4 * y] & (0x1 << _z)) return 1;
+	return 0;
+}
+
+u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z)
+{
+	return (
+			(get_bit(P, x, 0, z)	 )	|
+			(get_bit(P, x, 1, z) << 1)	|
+			(get_bit(P, x, 2, z) << 2)	|
+			(get_bit(P, x, 3, z) << 3)
+			);
+}
+
+bool lookup_S_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit)
+{
+	switch(output_row_bits)
+	{
+	case 0x0://in doc
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 1; return true;
+		case 2: input_bit = 1; return true;
+		case 4: input_bit = 1; return true;
+		default: return false;
+		}
+		break;
+	case 0x1://1000
+		return false;
+	case 0x2://0100
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 0; return true;
+		case 1: input_bit = 1; return true;
+		case 3: input_bit = 0; return true;
+		default: return false;
+		}
+		break;
+	case 0x3://1100
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 1; return true;
+		default: return false;
+		}
+		break;
+	case 0x4://0010
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 0; return true;
+		default: return false;
+		}
+		break;
+	case 0x5://1010
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 0; return true;
+		case 3: input_bit = 0; return true;
+		default: return false;
+		}
+		break;
+	case 0x6://0110
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 0; return true;
+		case 1: input_bit = 1; return true;
+		case 3: input_bit = 0; return true;
+		default: return false;
+		}
+		break;
+	case 0x7://1110
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 1; return true;
+		case 1: input_bit = 1; return true;
+		default: return false;
+		}
+		break;
+	case 0x8://0001
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 0; return true;
+		case 1: input_bit = 1; return true;
+		case 2: input_bit = 0; return true;
+		case 3: input_bit = 1; return true;
+		default: return false;
+		}
+		break;
+	case 0x9://1001
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 1; return true;
+		case 2: input_bit = 0; return true;
+		default: return false;
+		}
+		break;
+	case 0xA://0101
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 0; return true;
+		case 1: input_bit = 0; return true;
+		case 2: input_bit = 0; return true;
+		case 3: input_bit = 1; return true;
+		default: return false;
+		}
+		break;
+	case 0xB://1101
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 1; return true;
+		case 2: input_bit = 0; return true;
+		default: return false;
+		}
+		break;
+	case 0xC://0011
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 1; return true;
+		case 1: input_bit = 0; return true;
+		case 2: input_bit = 1; return true;
+		default: return false;
+		}
+		break;
+	case 0xD://1011
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 0; return true;
+		case 1: input_bit = 0; return true;
+		case 2: input_bit = 1; return true;
+		case 3: input_bit = 1; return true;
+		default: return false;
+		}
+		break;
+	case 0xE://0111
+		switch(input_bit_index)
+		{
+		case 0: input_bit = 0; return true;
+		case 1: input_bit = 1; return true;
+		case 2: input_bit = 1; return true;
+		case 3: input_bit = 1; return true;
+		default: return false;
+		}
+		break;
+	case 0xF://1111
+		switch(input_bit_index)
+		{
+		case 3: input_bit = 0; return true;
+		case 4: input_bit = 0; return true;
+		default: return false;
+		}
+		break;
+	default: return false;
+	}
+	return false;
 }
