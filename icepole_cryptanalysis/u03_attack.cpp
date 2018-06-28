@@ -31,6 +31,8 @@ void * u03_attacker(void *);
 int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id);
 int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat);
 u_int64_t left_rotate(u_int64_t v, size_t r);
+int encrypt_input(const u_int64_t * P, u_int64_t * C, u03_attacker_t * prm);
+int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -248,15 +250,20 @@ void * u03_attacker(void * arg)
 		u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
 		generate_inputs(P1, P2, prg, prm->id);
 
-		//if(log4cpp::Category::getInstance(prm->locat).isPriorityEnabled(700))
-			//trace_inputs(P1, P2, prm->locat.c_str());
+		u_int64_t C1[2 * BLONG_SIZE], C2[2 * BLONG_SIZE];
+		encrypt_input(P1, C1, prm);
+		encrypt_input(P2, C2, prm);
 
-		u_int8_t tc1[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE], tc2[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE];
-		u_int64_t * C1 = (u_int64_t *)tc1, * C2 = (u_int64_t *)tc2;
-		unsigned long long clen;
+		//XOR the 2nd P block with the 2nd C block to get the output of [P6] permutation.
+		u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
+		get_perm_output(P1, C1, P1_perm_output);
+		get_perm_output(P2, C2, P2_perm_output);
 
-		crypto_aead_encrypt((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
-		crypto_aead_encrypt((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
+		//XOR with the Kappa constant to undo the Kappa last step in [P6]
+		static const u_int8_t k_constant_r5_bytes[] = { 0x00, 0x04, 0x8D, 0x15, 0xFE, 0x26, 0xAF, 0x37 };
+		u_int64_t * k_constant_r5 = (u_int64_t *)k_constant_r5_bytes;
+		P1_perm_output[0] ^= *k_constant_r5;
+		P2_perm_output[0] ^= *k_constant_r5;
 
 		/* For each P:
 		 *
@@ -270,7 +277,7 @@ void * u03_attacker(void * arg)
 		 *
 		 * 			If we get the value of all target bits, calculate their XOR call it F1/F2.
 		 *
-		 * 	Apply pie & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
+		 * 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
 		 *
 		 * 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
 		 *
@@ -454,3 +461,26 @@ u_int64_t left_rotate(u_int64_t v, size_t r)
 	return (v << r) | (v >> (64-r));
 }
 
+int encrypt_input(const u_int64_t * P, u_int64_t * C, u03_attacker_t * prm)
+{
+	u_int8_t cenc[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+
+	crypto_aead_encrypt(cenc, &clen, (const unsigned char *)P, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
+	memcpy(C, cenc, 2*BLOCK_SIZE);
+
+	return 0;
+}
+
+int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output)
+{
+	const u_int64_t * P_2nd_block = (P+BLONG_SIZE), * C_2nd_block = (C+BLONG_SIZE);
+	for(int x = 0; x < 4; ++x)
+	{
+		for(int y = 0; y < 4; ++y)
+		{
+			RC2I(P_perm_output,x,y) = RC2I(P_2nd_block,x,y) ^ RC2I(C_2nd_block,x,y);
+		}
+	}
+	return 0;
+}
