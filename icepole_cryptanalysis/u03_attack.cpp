@@ -256,17 +256,18 @@ void * u03_attacker(void * arg)
 	memset(counter_1, 0, 4*sizeof(size_t));
 	memset(counter_2, 0, 4*sizeof(size_t));
 
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
+	u_int64_t C1[2 * BLONG_SIZE], C2[2 * BLONG_SIZE];
+
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
 	{
-		u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
 		generate_inputs(P1, P2, prg, prm->id);
 
 		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
-//		u_int64_t C1[2 * BLONG_SIZE], C2[2 * BLONG_SIZE];
-//		encrypt_input(P1, C1, prm);
+		encrypt_input(P1, C1, prm);
 //		encrypt_input(P2, C2, prm);
 
 		/* For each P:
@@ -443,7 +444,7 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		0x1, 0x0, 0x1, 0x0, //0x0,
 	};
 	*/
-	memcpy(P2, P1, BLOCK_SIZE);
+	memcpy(P2, P1, 2 * BLOCK_SIZE);
 	RC2I(P2,0,2) ^= 0x1;
 	RC2I(P2,1,0) ^= 0x1;
 	RC2I(P2,1,1) ^= 0x1;
@@ -453,8 +454,6 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 	RC2I(P2,2,3) ^= 0x1;
 	RC2I(P2,3,0) ^= 0x1;
 	RC2I(P2,3,2) ^= 0x1;
-
-	memset((u_int8_t *)P2 + BLOCK_SIZE, 0, BLOCK_SIZE);
 
 	for(size_t i = 0; i < BLONG_SIZE; ++i)
 	{
