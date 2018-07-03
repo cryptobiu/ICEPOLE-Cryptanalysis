@@ -32,7 +32,6 @@ void * u03_attacker(void *);
 int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id);
 int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat);
 u_int64_t left_rotate(u_int64_t v, size_t r);
-int encrypt_input(const u_int64_t * P, u_int64_t * C, u03_attacker_t * prm);
 int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
 bool last_S_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res);
 u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
@@ -257,7 +256,8 @@ void * u03_attacker(void * arg)
 	memset(counter_2, 0, 4*sizeof(size_t));
 
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
-	u_int64_t C1[2 * BLONG_SIZE], C2[2 * BLONG_SIZE];
+	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
 
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
@@ -267,8 +267,11 @@ void * u03_attacker(void * arg)
 		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
-		encrypt_input(P1, C1, prm);
-//		encrypt_input(P2, C2, prm);
+		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+		crypto_aead_encrypt((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
+
+		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+		crypto_aead_encrypt((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
 
 		/* For each P:
 		 *
@@ -497,17 +500,6 @@ u_int64_t left_rotate(u_int64_t v, size_t r)
 {
 	r = r % 64;
 	return (v << r) | (v >> (64-r));
-}
-
-int encrypt_input(const u_int64_t * P, u_int64_t * C, u03_attacker_t * prm)
-{
-	u_int8_t cenc[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE];
-	unsigned long long clen;
-
-	crypto_aead_encrypt(cenc, &clen, (const unsigned char *)P, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
-	memcpy(C, cenc, 2*BLOCK_SIZE);
-
-	return 0;
 }
 
 int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output)
