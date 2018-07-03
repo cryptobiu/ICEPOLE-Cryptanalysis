@@ -26,4 +26,6 @@ extern "C"
 		const unsigned char *ad,unsigned long long adlen,
 		const unsigned char *npub,
 		const unsigned char *k);
+
+	int pi_rho_mu(const unsigned char * c, unsigned char * c_);
 };

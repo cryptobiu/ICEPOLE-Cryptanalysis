@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <memory.h>
+#include <errno.h>
 
 #include <string>
 
@@ -23,6 +24,7 @@ typedef struct
 	u_int64_t * U0, * U3;
 	u_int64_t * samples_done;
 	u_int8_t * key, * iv;
+	size_t v0v1;
 }u03_attacker_t;
 
 void sigint_cb(evutil_socket_t, short, void *);
@@ -34,10 +36,11 @@ u_int64_t left_rotate(u_int64_t v, size_t r);
 int encrypt_input(const u_int64_t * P, u_int64_t * C, u03_attacker_t * prm);
 int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
 void undo_last_perm_kappa(u_int64_t * P_perm_output);
-bool last_S_lookup_filter(u_int64_t * P_perm_output, u_int8_t F_xor_res);
+bool last_S_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res);
 u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_S_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit);
+size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -110,6 +113,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].samples_done = samples_done + i;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
+								atckr_prms[i].v0v1 = 0x100;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -249,31 +253,22 @@ void * u03_attacker(void * arg)
 		exit(__LINE__);
 	}
 
+	size_t counter_1[4], counter_2[4];
+	memset(counter_1, 0, 4*sizeof(size_t));
+	memset(counter_2, 0, 4*sizeof(size_t));
+
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
 	{
 		u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
 		generate_inputs(P1, P2, prg, prm->id);
 
+		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
+		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
+
 		u_int64_t C1[2 * BLONG_SIZE], C2[2 * BLONG_SIZE];
 		encrypt_input(P1, C1, prm);
 		encrypt_input(P2, C2, prm);
-
-		//XOR the 2nd P block with the 2nd C block to get the output of [P6] permutation.
-		u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
-		get_perm_output(P1, C1, P1_perm_output);
-		get_perm_output(P2, C2, P2_perm_output);
-
-		//XOR with the Kappa constant to undo the Kappa last step in [P6]
-		undo_last_perm_kappa(P1_perm_output);
-		undo_last_perm_kappa(P2_perm_output);
-
-		u_int8_t F1 = 0, F2 = 0;
-		if(!last_S_lookup_filter(P1_perm_output, F1))
-			continue;
-		if(!last_S_lookup_filter(P2_perm_output, F2))
-			continue;
-
 
 		/* For each P:
 		 *
@@ -286,28 +281,40 @@ void * u03_attacker(void * arg)
 		 * 			If we don't get the value for the target bit before the last-S the filter fails (move on).
 		 *
 		 * 			If we get the value of all target bits, calculate their XOR call it F1/F2.
-		 *
-		 * 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
-		 *
-		 * 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
-		 *
-		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
-		 *
-		 * 	!!! For all of the above: apply shift-left by ID for everything !!!
-		 *
-		 * 	Once this is done for 2^33.9 samples, check for which counter pair the deviation from 0.5 is greatest:
-		 * 	divide counter-2[v0,v1] by counter-1[v0,v1] and abs ( sub 0.5 ). get the (v0,v1) of the counter with max result.
-		 *
-		 * 	Collect the ID, v0 and v1 for all thread and rejoin.
-		 *
-		 * 	Now it is possible to execute step 4 of the guesswork to calculate all bits of U0 and U3
-		 *
 		 */
 
-		//if(log4cpp::Category::getInstance(prm->locat).isDebugEnabled())
-			//log4cpp::Category::getInstance(prm->locat).debug("%s: plaintext size = %lu; cyphertext size = %lu;", __FUNCTION__, 2*BLOCK_SIZE, clen);
+		//XOR the 2nd P block with the 2nd C block to get the output of [P6] permutation.
+		u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
+		get_perm_output(P1, C1, P1_perm_output);
+		get_perm_output(P2, C2, P2_perm_output);
 
-		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
+		//XOR with the Kappa constant to undo the Kappa last step in [P6]
+		undo_last_perm_kappa(P1_perm_output);
+		undo_last_perm_kappa(P2_perm_output);
+
+		u_int8_t F1 = 0, F2 = 0;
+		if(!last_S_lookup_filter(P1_perm_output, prm->id, F1))
+			continue;
+		if(!last_S_lookup_filter(P2_perm_output, prm->id, F2))
+			continue;
+
+		/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
+		 */
+		size_t n = lookup_counter_bits(C1, prm->id);
+
+		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
+		 */
+		counter_1[n]++;
+
+		/*
+		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
+		 */
+		if(F1 == F2)
+			counter_2[n]++;
+
+		/*
+		 * 	!!! For all of the above: apply shift-left by ID for everything !!!
+		 */
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
@@ -318,6 +325,29 @@ void * u03_attacker(void * arg)
 			exit(__LINE__);
 		}
 	}
+
+	/*
+	 * 	Once the above is done for 2^33.9 samples, check for which counter pair the deviation from 0.5 is greatest:
+	 * 	divide counter-2[v0,v1] by counter-1[v0,v1] and abs ( sub 0.5 ). get the (v0,v1) of the counter with max result.
+	 *
+	 * 	Collect the ID, v0 and v1 for all thread and rejoin.
+	 *
+	 * 	Now it is possible to execute step 4 of the guesswork to calculate all bits of U0 and U3
+	 *
+	 */
+
+	size_t dev_counter = 4;
+	double max_dev = 0.0;
+	for(size_t i = 0; i < 4; ++i)
+	{
+		double dev = abs( (double(counter_2[i]) / double(counter_1[i])) - 0.5 );
+		if(max_dev < dev)
+		{
+			max_dev = dev;
+			dev_counter = i;
+		}
+	}
+	prm->v0v1 = dev_counter;
 	return NULL;
 }
 
@@ -502,9 +532,14 @@ void undo_last_perm_kappa(u_int64_t * P_perm_output)
 	P_perm_output[0] ^= *k_constant_r5;
 }
 
-bool last_S_lookup_filter(u_int64_t * P_perm_output, u_int8_t F_xor_res)
+#define CHECKBIT(X,Z,rb,ib,xr) \
+{ rb = get_row_bits(P_perm_output, X, Z); ib = 0; \
+if(lookup_S_input_bit(rb, 0, ib))  xr ^= ib; \
+else return false; }
+
+bool last_S_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res)
 {
-	/*
+	/* This is the Omega mask for thread with id=0; for all others shift by id must be applied to z
 	const u_int64_t omega_mask[16] =
 	{
 		0x0008000000000000, 0x0000000200000000, 0x0000000000000000, 0x0000000000001000, //0x0000000000000000,
@@ -522,12 +557,19 @@ bool last_S_lookup_filter(u_int64_t * P_perm_output, u_int8_t F_xor_res)
 	[3][3][25]
 	 */
 
-	//[0][0][51]
-	u_int8_t row_bits = get_row_bits(P_perm_output, 0, 51), input_bit = 0;
-	if(lookup_S_input_bit(row_bits, 0, input_bit))
+	static const struct __row_t { size_t x; size_t z; } rows[8] = {  {0, 51}, {0, 33}, {0, 12}, {1, 35}, {2, 54}, {2, 30}, {3, 10}, {3, 25} };
+
+	u_int8_t row_bits, input_bit;
+	F_xor_res = 0;
+
+	for(size_t i = 0; i < 8; ++i)
 	{
-#error 'here'
+		struct __row_t current_row = rows[i];
+		current_row.z = left_rotate(current_row.z, id);
+		CHECKBIT(current_row.x, current_row.z, row_bits, input_bit, F_xor_res)
 	}
+
+	return true;
 }
 
 u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z)
@@ -686,4 +728,15 @@ bool lookup_S_input_bit(const u_int8_t output_row_bits, const size_t input_bit_i
 	default: return false;
 	}
 	return false;
+}
+
+size_t lookup_counter_bits(const u_int64_t * C, const size_t id)
+{
+	u_int64_t LC[BLONG_SIZE];
+	pi_rho_mu((const unsigned char *)C, (unsigned char *)LC);
+
+	u_int64_t x = 3, y_hi = 1, y_lo = 3, z = 41;
+
+	return (get_bit(LC, x, y_hi, left_rotate(z, id)) << 1) | (get_bit(LC, x, y_lo, left_rotate(z, id)));
+
 }

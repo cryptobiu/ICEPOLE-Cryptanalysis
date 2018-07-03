@@ -182,3 +182,13 @@ int crypto_aead_decrypt(
     return 0;
 }
 
+int pi_rho_mu(const unsigned char * c, unsigned char * c_)
+{
+	ICESTATE Ss, Sp, Sr, Sm;
+	memcpy(Ss, c, 16*sizeof(u_int64_t));
+	Pi(Sp, Ss);
+	Rho(Sr, Sp);
+	Mu(Sm, Sr);
+	memcpy(c_, Sm, 16*sizeof(u_int64_t));
+	return 0;
+}
