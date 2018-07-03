@@ -282,34 +282,34 @@ void * u03_attacker(void * arg)
 		 * 			If we get the value of all target bits, calculate their XOR call it F1/F2.
 		 */
 
-		//XOR the 2nd P block with the 2nd C block to get the output of [P6] permutation.
-		u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
-		get_perm_output(P1, C1, P1_perm_output);
-		get_perm_output(P2, C2, P2_perm_output);
-
-		//XOR with the Kappa constant to undo the Kappa last step in [P6]
-		kappa5((unsigned char *)P1_perm_output);
-		kappa5((unsigned char *)P2_perm_output);
-
-		u_int8_t F1 = 0, F2 = 0;
-		if(!last_S_lookup_filter(P1_perm_output, prm->id, F1))
-			continue;
-		if(!last_S_lookup_filter(P2_perm_output, prm->id, F2))
-			continue;
-
-		/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
-		 */
-		size_t n = lookup_counter_bits(C1, prm->id);
-
-		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
-		 */
-		counter_1[n]++;
-
-		/*
-		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
-		 */
-		if(F1 == F2)
-			counter_2[n]++;
+//		//XOR the 2nd P block with the 2nd C block to get the output of [P6] permutation.
+//		u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
+//		get_perm_output(P1, C1, P1_perm_output);
+//		get_perm_output(P2, C2, P2_perm_output);
+//
+//		//XOR with the Kappa constant to undo the Kappa last step in [P6]
+//		kappa5((unsigned char *)P1_perm_output);
+//		kappa5((unsigned char *)P2_perm_output);
+//
+//		u_int8_t F1 = 0, F2 = 0;
+//		if(!last_S_lookup_filter(P1_perm_output, prm->id, F1))
+//			continue;
+//		if(!last_S_lookup_filter(P2_perm_output, prm->id, F2))
+//			continue;
+//
+//		/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
+//		 */
+//		size_t n = lookup_counter_bits(C1, prm->id);
+//
+//		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
+//		 */
+//		counter_1[n]++;
+//
+//		/*
+//		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
+//		 */
+//		if(F1 == F2)
+//			counter_2[n]++;
 
 		/*
 		 * 	!!! For all of the above: apply shift-left by ID for everything !!!
