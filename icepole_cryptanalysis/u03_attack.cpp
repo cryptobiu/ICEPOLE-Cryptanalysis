@@ -21,10 +21,9 @@ typedef struct
 	size_t id;
 	std::string locat;
 	sem_t * run_flag;
-	u_int64_t * U0, * U3;
 	u_int64_t * samples_done;
 	u_int8_t * key, * iv;
-	size_t v0v1;
+	u_int64_t v0v1;
 }u03_attacker_t;
 
 void sigint_cb(evutil_socket_t, short, void *);
@@ -40,6 +39,7 @@ u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_S_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit);
 size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
+void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -107,8 +107,6 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].id = i;
 								atckr_prms[i].locat = locat;
 								atckr_prms[i].run_flag = &run_flag;
-								atckr_prms[i].U0 = &U0;
-								atckr_prms[i].U3 = &U3;
 								atckr_prms[i].samples_done = samples_done + i;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
@@ -151,6 +149,8 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								log4cpp::Category::getInstance(locat).debug("%s: u03 attacker thread %lu joined.", __FUNCTION__, i);
 							}
 							log4cpp::Category::getInstance(locat).notice("%s: all u03 attacker threads are joined.", __FUNCTION__);
+
+							guess_work(atckr_prms, U0, U3, locat);
 
 							event_del(timer_evt);
 							log4cpp::Category::getInstance(locat).debug("%s: the timer event was removed.", __FUNCTION__);
@@ -730,5 +730,17 @@ size_t lookup_counter_bits(const u_int64_t * C, const size_t id)
 	u_int64_t x = 3, y_hi = 1, y_lo = 3, z = 41;
 
 	return (get_bit(LC, x, y_hi, left_rotate(z, id)) << 1) | (get_bit(LC, x, y_lo, left_rotate(z, id)));
+
+}
+
+void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
+{
+	U3 = 0;
+	for(std::vector<u03_attacker_t>::const_iterator i = atckr_prms.begin(); i != atckr_prms.end(); ++i)
+	{
+		u_int64_t v0 = (i->v0v1 & 0x10) >> 1;
+		U3 |= left_rotate((v0 ^ 1), 31 + i->id);
+	}
+	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
 
 }
