@@ -35,7 +35,6 @@ int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat)
 u_int64_t left_rotate(u_int64_t v, size_t r);
 int encrypt_input(const u_int64_t * P, u_int64_t * C, u03_attacker_t * prm);
 int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
-void undo_last_perm_kappa(u_int64_t * P_perm_output);
 bool last_S_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res);
 u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
@@ -289,8 +288,8 @@ void * u03_attacker(void * arg)
 		get_perm_output(P2, C2, P2_perm_output);
 
 		//XOR with the Kappa constant to undo the Kappa last step in [P6]
-		undo_last_perm_kappa(P1_perm_output);
-		undo_last_perm_kappa(P2_perm_output);
+		kappa5((unsigned char *)P1_perm_output);
+		kappa5((unsigned char *)P2_perm_output);
 
 		u_int8_t F1 = 0, F2 = 0;
 		if(!last_S_lookup_filter(P1_perm_output, prm->id, F1))
@@ -523,13 +522,6 @@ int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm
 		}
 	}
 	return 0;
-}
-
-void undo_last_perm_kappa(u_int64_t * P_perm_output)
-{
-	static const u_int8_t k_constant_r5_bytes[] = { 0x00, 0x04, 0x8D, 0x15, 0xFE, 0x26, 0xAF, 0x37 };
-	u_int64_t * k_constant_r5 = (u_int64_t *)k_constant_r5_bytes;	// = 0x37AF26FE158D0400
-	P_perm_output[0] ^= *k_constant_r5;
 }
 
 #define CHECKBIT(X,Z,rb,ib,xr) \

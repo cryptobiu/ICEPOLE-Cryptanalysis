@@ -182,6 +182,15 @@ int crypto_aead_decrypt(
     return 0;
 }
 
+int kappa5(unsigned char * p)
+{
+	ICESTATE Ss, Sk;
+	memcpy(Ss, p, sizeof(u_int64_t));
+	Kappa(Sk, Ss, 5);
+	memcpy(p, Sk, sizeof(u_int64_t));
+	return 0;
+}
+
 int pi_rho_mu(const unsigned char * c, unsigned char * c_)
 {
 	ICESTATE Ss, Sp, Sr, Sm;

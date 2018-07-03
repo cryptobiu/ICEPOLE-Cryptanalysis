@@ -27,5 +27,6 @@ extern "C"
 		const unsigned char *npub,
 		const unsigned char *k);
 
+	int kappa5(unsigned char * p);
 	int pi_rho_mu(const unsigned char * c, unsigned char * c_);
 };
