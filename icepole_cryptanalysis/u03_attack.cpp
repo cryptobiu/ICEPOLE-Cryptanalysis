@@ -265,9 +265,9 @@ void * u03_attacker(void * arg)
 		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
-		u_int64_t C1[2 * BLONG_SIZE], C2[2 * BLONG_SIZE];
-		encrypt_input(P1, C1, prm);
-		encrypt_input(P2, C2, prm);
+//		u_int64_t C1[2 * BLONG_SIZE], C2[2 * BLONG_SIZE];
+//		encrypt_input(P1, C1, prm);
+//		encrypt_input(P2, C2, prm);
 
 		/* For each P:
 		 *
