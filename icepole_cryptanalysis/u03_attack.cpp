@@ -48,7 +48,7 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 10;//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 16029384739;
 
 typedef struct
 {
