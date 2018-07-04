@@ -87,7 +87,7 @@ void init_log(const char * a_log_file, const char * a_log_dir, const int log_lev
 	log_file.insert(0, a_log_dir);
 
     log4cpp::Layout * log_layout = NULL;
-    log4cpp::Appender * appender = new log4cpp::RollingFileAppender("rlf.appender", log_file.c_str(), 10*1024*1024, 5);
+    log4cpp::Appender * appender = new log4cpp::RollingFileAppender("rlf.appender", log_file.c_str(), 200*1024*1024, 100);
 
     bool pattern_layout = false;
     try
