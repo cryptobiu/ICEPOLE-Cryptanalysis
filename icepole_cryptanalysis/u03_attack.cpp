@@ -699,17 +699,18 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 	for(std::vector<u03_attacker_t>::const_iterator j = atckr_prms.begin(); j != atckr_prms.end(); ++j)
 	{
 		size_t max_dev_counter_index = 4;
-		double max_dev = 0.0;
+		double max_dev = 0.0, dev;
 		for(size_t i = 0; i < 4; ++i)
 		{
-			double dev = abs( (double(j->ctr_2[i]) / double(j->ctr_1[i])) - 0.5 );
-			if(max_dev < dev)
+			dev = (0 != j->ctr_1[i])? abs( (double(j->ctr_2[i]) / double(j->ctr_1[i])) - 0.5 ): 0.5;
+			if(max_dev <= dev)
 			{
 				max_dev = dev;
 				max_dev_counter_index = i;
 			}
 			log4cpp::Category::getInstance(j->locat).notice("%s: id=%u; ctr1[%lu]=%lu; ctr2[%lu]=%lu.", __FUNCTION__, j->id, i, j->ctr_1[i], i, j->ctr_2[i]);
 		}
+
 		u_int64_t v0v1 = max_dev_counter_index;
 		log4cpp::Category::getInstance(j->locat).notice("%s: selected v0v1 = %lu; v0 = %lu; v1 = %lu.", __FUNCTION__, v0v1, (v0v1 & 0x10) >> 1, (v0v1 & 0x1));
 
