@@ -298,6 +298,8 @@ void * u03_attacker(void * arg)
 			u_int8_t F2 = 0;
 			if(last_Sbox_lookup_filter(P2_perm_output, prm->id, F2, prm->locat.c_str()))
 			{
+				log4cpp::Category::getInstance(prm->locat).debug("%s: F1=%hhu; F2=%hhu;", __FUNCTION__, F1, F2);
+
 				/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
 				 */
 				size_t n = lookup_counter_bits(C1, prm->id);
