@@ -30,10 +30,9 @@ void sigint_cb(evutil_socket_t, short, void *);
 void timer_cb(evutil_socket_t, short, void *);
 void * u03_attacker(void *);
 int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id);
-int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat);
 u_int64_t left_rotate(u_int64_t v, size_t r);
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
-bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res);
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit);
@@ -293,9 +292,9 @@ void * u03_attacker(void * arg)
 		kappa5((unsigned char *)P2_perm_output);
 
 		u_int8_t F1 = 0, F2 = 0;
-		if(!last_Sbox_lookup_filter(P1_perm_output, prm->id, F1))
+		if(!last_Sbox_lookup_filter(P1_perm_output, prm->id, F1, prm->locat.c_str()))
 			continue;
-		if(!last_Sbox_lookup_filter(P2_perm_output, prm->id, F2))
+		if(!last_Sbox_lookup_filter(P2_perm_output, prm->id, F2, prm->locat.c_str()))
 			continue;
 
 		/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
@@ -454,37 +453,6 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 	}
 }
 
-int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat)
-{
-	char buffer[32];
-
-	std::string str = "inputs:\n";
-
-	str += "P1=\n";
-	for(size_t i = 0; i < 4; i++)
-	{
-		for(size_t j = 0; j < 4; j++)
-		{
-			snprintf(buffer, 32, "0x%016lX, ", P1[4*i+j]);
-			str += buffer;
-		}
-		str += "0x0000000000000000\n";
-	}
-
-	str += "P2=\n";
-	for(size_t i = 0; i < 4; i++)
-	{
-		for(size_t j = 0; j < 4; j++)
-		{
-			snprintf(buffer, 32, "0x%016lX, ", P2[4*i+j]);
-			str += buffer;
-		}
-		str += "0x0000000000000000\n";
-	}
-
-	log4cpp::Category::getInstance(locat).debug(str.c_str());
-}
-
 u_int64_t left_rotate(u_int64_t v, size_t r)
 {
 	r = r % 64;
@@ -503,13 +471,14 @@ int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t *
 	}
 	return 0;
 }
-
+/*
 #define CHECKBIT(X,Z,rb,ib,xr) \
 { rb = get_row_bits(P_perm_output, X, Z); ib = 0; \
 if(lookup_Sbox_input_bit(rb, 0, ib))  xr ^= ib; \
 else return false; }
+*/
 
-bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res)
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat)
 {
 	/* This is the Omega mask for thread with id=0; for all others shift by id must be applied to z
 	const u_int64_t omega_mask[16] =
@@ -529,7 +498,8 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 	[3][3][25]
 	 */
 
-	static const struct __row_t { size_t x; size_t z; } rows[8] = {  {0, 51}, {0, 33}, {0, 12}, {1, 35}, {2, 54}, {2, 30}, {3, 10}, {3, 25} };
+	static const struct __row_t { size_t x; size_t y; size_t z; } rows[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
+																				{2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
 
 	u_int8_t row_bits, input_bit;
 	F_xor_res = 0;
@@ -538,7 +508,31 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 	{
 		struct __row_t current_row = rows[i];
 		current_row.z = left_rotate(current_row.z, id);
-		CHECKBIT(current_row.x, current_row.z, row_bits, input_bit, F_xor_res)
+		//CHECKBIT(current_row.x, current_row.z, row_bits, input_bit, F_xor_res)
+
+		row_bits = get_row_bits(P_perm_output, current_row.x, current_row.z);
+		input_bit = 0;
+		if(lookup_Sbox_input_bit(row_bits, current_row.y, input_bit))
+			F_xor_res ^= input_bit;
+		else
+		{
+			char buffer[32];
+			std::string str;
+			str += "P_perm_output=\n";
+			for(size_t k = 0; k < 4; ++k)
+			{
+				for(size_t l = 0; l < 4; ++l)
+				{
+					snprintf(buffer, 32, "0x%016lX, ", RC2I(P_perm_output,k,l));
+					str += buffer;
+				}
+				str += "\n";
+			}
+			log4cpp::Category::getInstance(logcat).debug("%s: lookup_Sbox_input_bit() failure; row_bits=%02X; %s",
+					__FUNCTION__, row_bits, str.c_str());
+
+			return false;
+		}
 	}
 
 	return true;
