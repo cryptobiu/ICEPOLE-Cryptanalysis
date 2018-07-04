@@ -713,8 +713,9 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 		}
 
 		u_int64_t v[2];
-		v[0] = (max_dev_counter_index & 0x10)? 1: 0;
-		v[1] = (max_dev_counter_index & 0x01)? 1: 0;
+		v[0] = (max_dev_counter_index & 0x2)? 1: 0;
+		v[1] = (max_dev_counter_index & 0x1)? 1: 0;
+
 		log4cpp::Category::getInstance(j->locat).notice("%s: selected ctr-idx = %lu; v0 = %lu; v1 = %lu.",
 				__FUNCTION__, max_dev_counter_index, v[0], v[1]);
 
