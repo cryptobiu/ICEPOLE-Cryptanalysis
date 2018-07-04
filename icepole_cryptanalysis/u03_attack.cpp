@@ -23,7 +23,7 @@ typedef struct
 	sem_t * run_flag;
 	u_int64_t * samples_done;
 	u_int8_t * key, * iv;
-	u_int64_t v0v1;
+	u_int64_t ctr_1[4], ctr_2[4];
 }u03_attacker_t;
 
 void sigint_cb(evutil_socket_t, short, void *);
@@ -32,11 +32,11 @@ void * u03_attacker(void *);
 int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id);
 int trace_inputs(const u_int64_t * P1, const u_int64_t * P2, const char * locat);
 u_int64_t left_rotate(u_int64_t v, size_t r);
-int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
-bool last_S_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res);
+int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res);
 u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
-bool lookup_S_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit);
+bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit);
 size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 
@@ -109,7 +109,8 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].samples_done = samples_done + i;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
-								atckr_prms[i].v0v1 = 0x100;
+								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
+								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -251,10 +252,6 @@ void * u03_attacker(void * arg)
 		exit(__LINE__);
 	}
 
-	size_t counter_1[4], counter_2[4];
-	memset(counter_1, 0, 4*sizeof(size_t));
-	memset(counter_2, 0, 4*sizeof(size_t));
-
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
 	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
@@ -286,34 +283,34 @@ void * u03_attacker(void * arg)
 		 * 			If we get the value of all target bits, calculate their XOR call it F1/F2.
 		 */
 
-//		//XOR the 2nd P block with the 2nd C block to get the output of [P6] permutation.
-//		u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
-//		get_perm_output(P1, C1, P1_perm_output);
-//		get_perm_output(P2, C2, P2_perm_output);
-//
-//		//XOR with the Kappa constant to undo the Kappa last step in [P6]
-//		kappa5((unsigned char *)P1_perm_output);
-//		kappa5((unsigned char *)P2_perm_output);
-//
-//		u_int8_t F1 = 0, F2 = 0;
-//		if(!last_S_lookup_filter(P1_perm_output, prm->id, F1))
-//			continue;
-//		if(!last_S_lookup_filter(P2_perm_output, prm->id, F2))
-//			continue;
-//
-//		/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
-//		 */
-//		size_t n = lookup_counter_bits(C1, prm->id);
-//
-//		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
-//		 */
-//		counter_1[n]++;
-//
-//		/*
-//		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
-//		 */
-//		if(F1 == F2)
-//			counter_2[n]++;
+		//XOR the 2nd P block with the 2nd C block to get the output of [P6] permutation.
+		u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
+		get_permutation_output(P1, C1, P1_perm_output);
+		get_permutation_output(P2, C2, P2_perm_output);
+
+		//XOR with the Kappa constant to undo the Kappa last step in [P6]
+		kappa5((unsigned char *)P1_perm_output);
+		kappa5((unsigned char *)P2_perm_output);
+
+		u_int8_t F1 = 0, F2 = 0;
+		if(!last_Sbox_lookup_filter(P1_perm_output, prm->id, F1))
+			continue;
+		if(!last_Sbox_lookup_filter(P2_perm_output, prm->id, F2))
+			continue;
+
+		/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
+		 */
+		size_t n = lookup_counter_bits(C1, prm->id);
+
+		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
+		 */
+		prm->ctr_1[n]++;
+
+		/*
+		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
+		 */
+		if(F1 == F2)
+			prm->ctr_2[n]++;
 
 		/*
 		 * 	!!! For all of the above: apply shift-left by ID for everything !!!
@@ -337,20 +334,12 @@ void * u03_attacker(void * arg)
 	 *
 	 * 	Now it is possible to execute step 4 of the guesswork to calculate all bits of U0 and U3
 	 *
+	 * 	-------------> The above is done for all threads together post-join.
+	 *
 	 */
 
-	size_t dev_counter = 4;
-	double max_dev = 0.0;
-	for(size_t i = 0; i < 4; ++i)
-	{
-		double dev = abs( (double(counter_2[i]) / double(counter_1[i])) - 0.5 );
-		if(max_dev < dev)
-		{
-			max_dev = dev;
-			dev_counter = i;
-		}
-	}
-	prm->v0v1 = dev_counter;
+	log4cpp::Category::getInstance(prm->locat).debug("%s: exit.", __FUNCTION__);
+
 	return NULL;
 }
 
@@ -502,7 +491,7 @@ u_int64_t left_rotate(u_int64_t v, size_t r)
 	return (v << r) | (v >> (64-r));
 }
 
-int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output)
+int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output)
 {
 	const u_int64_t * P_2nd_block = (P+BLONG_SIZE), * C_2nd_block = (C+BLONG_SIZE);
 	for(int x = 0; x < 4; ++x)
@@ -517,10 +506,10 @@ int get_perm_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm
 
 #define CHECKBIT(X,Z,rb,ib,xr) \
 { rb = get_row_bits(P_perm_output, X, Z); ib = 0; \
-if(lookup_S_input_bit(rb, 0, ib))  xr ^= ib; \
+if(lookup_Sbox_input_bit(rb, 0, ib))  xr ^= ib; \
 else return false; }
 
-bool last_S_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res)
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res)
 {
 	/* This is the Omega mask for thread with id=0; for all others shift by id must be applied to z
 	const u_int64_t omega_mask[16] =
@@ -572,7 +561,7 @@ u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z)
 			);
 }
 
-bool lookup_S_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit)
+bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit)
 {
 	switch(output_row_bits)
 	{
@@ -727,10 +716,25 @@ size_t lookup_counter_bits(const u_int64_t * C, const size_t id)
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
 {
 	U3 = 0;
-	for(std::vector<u03_attacker_t>::const_iterator i = atckr_prms.begin(); i != atckr_prms.end(); ++i)
+	for(std::vector<u03_attacker_t>::const_iterator j = atckr_prms.begin(); j != atckr_prms.end(); ++j)
 	{
-		u_int64_t v0 = (i->v0v1 & 0x10) >> 1;
-		U3 |= left_rotate((v0 ^ 1), 31 + i->id);
+		size_t max_dev_counter_index = 4;
+		double max_dev = 0.0;
+		for(size_t i = 0; i < 4; ++i)
+		{
+			double dev = abs( (double(j->ctr_2[i]) / double(j->ctr_1[i])) - 0.5 );
+			if(max_dev < dev)
+			{
+				max_dev = dev;
+				max_dev_counter_index = i;
+			}
+			log4cpp::Category::getInstance(j->locat).notice("%s: id=%u; ctr1[%lu]=%lu; ctr2[%lu]=%lu.", __FUNCTION__, j->id, i, j->ctr_1[i], i, j->ctr_2[i]);
+		}
+		u_int64_t v0v1 = max_dev_counter_index;
+		log4cpp::Category::getInstance(j->locat).notice("%s: selected v0v1 = %lu; v0 = %lu; v1 = %lu.", __FUNCTION__, v0v1, (v0v1 & 0x10) >> 1, (v0v1 & 0x1));
+
+		u_int64_t v0 = (v0v1 & 0x10) >> 1;
+		U3 |= left_rotate((v0 ^ 1), 31 + j->id);
 	}
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
 
