@@ -35,7 +35,7 @@ int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t *
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
-bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit);
+bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 std::string block2text(const u_int64_t * B);
@@ -543,7 +543,7 @@ u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z)
 			);
 }
 
-bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit)
+bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit)
 {
 	switch(output_row_bits)
 	{
