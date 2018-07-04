@@ -47,7 +47,7 @@ std::string block2text(const u_int64_t * B);
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 10000000;//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 100000;//16029384739;
 
 typedef struct
 {
@@ -295,15 +295,9 @@ void * u03_attacker(void * arg)
 		u_int8_t F1 = 0;
 		if(last_Sbox_lookup_filter(P1_perm_output, prm->id, F1, prm->locat.c_str()))
 		{
-			//log4cpp::Category::getInstance(prm->locat).debug("%s: last_Sbox_lookup_filter(P1) success: %s", __FUNCTION__, block2text(P1_perm_output).c_str());
-			log4cpp::Category::getInstance(prm->locat).debug("%s: last_Sbox_lookup_filter(P1) success.", __FUNCTION__);
-
 			u_int8_t F2 = 0;
 			if(last_Sbox_lookup_filter(P2_perm_output, prm->id, F2, prm->locat.c_str()))
 			{
-				//log4cpp::Category::getInstance(prm->locat).debug("%s: last_Sbox_lookup_filter(P2) success: %s", __FUNCTION__, block2text(P2_perm_output).c_str());
-				log4cpp::Category::getInstance(prm->locat).debug("%s: last_Sbox_lookup_filter(P2) success.", __FUNCTION__);
-
 				/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
 				 */
 				size_t n = lookup_counter_bits(C1, prm->id);
@@ -322,16 +316,6 @@ void * u03_attacker(void * arg)
 				 * 	!!! For all of the above: apply shift-left by ID for everything !!!
 				 */
 			}
-			else
-			{
-				//log4cpp::Category::getInstance(prm->locat).debug("%s: last_Sbox_lookup_filter(P2) failure: %s", __FUNCTION__, block2text(P2_perm_output).c_str());
-				log4cpp::Category::getInstance(prm->locat).debug("%s: last_Sbox_lookup_filter(P2) failure.", __FUNCTION__);
-			}
-		}
-		else
-		{
-			//log4cpp::Category::getInstance(prm->locat).debug("%s: last_Sbox_lookup_filter(P1) failure: %s", __FUNCTION__, block2text(P1_perm_output).c_str());
-			log4cpp::Category::getInstance(prm->locat).debug("%s: last_Sbox_lookup_filter(P1) failure.", __FUNCTION__);
 		}
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
