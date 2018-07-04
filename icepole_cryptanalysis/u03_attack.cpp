@@ -707,7 +707,7 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 				dev = abs( ( double(j->ctr_2[i]) / double(j->ctr_1[i]) ) - 0.5 );
 
 			log4cpp::Category::getInstance(j->locat).debug("%s: ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.03f;",
-					__FUNCTION__, j->ctr_1[i], i, j->ctr_2[i], dev);
+					__FUNCTION__, i, j->ctr_1[i], i, j->ctr_2[i], dev);
 
 			if(max_dev < dev)
 			{
