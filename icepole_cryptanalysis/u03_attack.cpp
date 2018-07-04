@@ -46,7 +46,7 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 100000;//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 100;//16029384739;
 
 typedef struct
 {
@@ -291,29 +291,31 @@ void * u03_attacker(void * arg)
 		kappa5((unsigned char *)P1_perm_output);
 		kappa5((unsigned char *)P2_perm_output);
 
-		u_int8_t F1 = 0, F2 = 0;
-		if(!last_Sbox_lookup_filter(P1_perm_output, prm->id, F1, prm->locat.c_str()))
-			continue;
-		if(!last_Sbox_lookup_filter(P2_perm_output, prm->id, F2, prm->locat.c_str()))
-			continue;
+		u_int8_t F1 = 0;
+		if(last_Sbox_lookup_filter(P1_perm_output, prm->id, F1, prm->locat.c_str()))
+		{
+			u_int8_t F2 = 0;
+			if(last_Sbox_lookup_filter(P2_perm_output, prm->id, F2, prm->locat.c_str()))
+			{
+				/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
+				 */
+				size_t n = lookup_counter_bits(C1, prm->id);
 
-		/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
-		 */
-		size_t n = lookup_counter_bits(C1, prm->id);
+				/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
+				 */
+				prm->ctr_1[n]++;
 
-		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
-		 */
-		prm->ctr_1[n]++;
+				/*
+				 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
+				 */
+				if(F1 == F2)
+					prm->ctr_2[n]++;
 
-		/*
-		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
-		 */
-		if(F1 == F2)
-			prm->ctr_2[n]++;
-
-		/*
-		 * 	!!! For all of the above: apply shift-left by ID for everything !!!
-		 */
+				/*
+				 * 	!!! For all of the above: apply shift-left by ID for everything !!!
+				 */
+			}//else { // }
+		}//else { // }
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
@@ -528,8 +530,8 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 				}
 				str += "\n";
 			}
-			log4cpp::Category::getInstance(logcat).debug("%s: lookup_Sbox_input_bit() failure; row_bits=%02X; %s",
-					__FUNCTION__, row_bits, str.c_str());
+			log4cpp::Category::getInstance(logcat).debug("%s: lookup_Sbox_input_bit() failure; row_bits=%02X; row=[%lu][%lu][%lu]; %s",
+					__FUNCTION__, row_bits, current_row.x, current_row.y, current_row.z, str.c_str());
 
 			return false;
 		}
