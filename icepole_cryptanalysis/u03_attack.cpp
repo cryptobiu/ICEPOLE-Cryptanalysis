@@ -515,20 +515,10 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 
 		row_bits = get_row_bits(P_perm_output, current_row.x, current_row.z);
 		input_bit = 0;
-		std::string str = block2text(P_perm_output);
 		if(lookup_Sbox_input_bit(row_bits, current_row.y, input_bit))
-		{
-			log4cpp::Category::getInstance(logcat).debug("%s: lookup_Sbox_input_bit() success; row_bits=%02X; Om=[%lu][%lu][%lu]; input_bit=%02X; %s",
-					__FUNCTION__, row_bits, current_row.x, current_row.y, current_row.z, input_bit, str.c_str());
 			F_xor_res ^= input_bit;
-		}
 		else
-		{
-			log4cpp::Category::getInstance(logcat).debug("%s: lookup_Sbox_input_bit() failure; row_bits=%02X; Om=[%lu][%lu][%lu]; %s",
-					__FUNCTION__, row_bits, current_row.x, current_row.y, current_row.z, str.c_str());
-
 			return false;
-		}
 	}
 
 	return true;
@@ -733,13 +723,13 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 std::string block2text(const u_int64_t * B)
 {
 	std::string str;
-	char buffer[32];
+	char buffer[64];
 	str += "block=\n";
 	for(size_t x = 0; x < 4; ++x)
 	{
 		for(size_t y = 0; y < 4; ++y)
 		{
-			snprintf(buffer, 32, "B[%lu][%lu]=0x%016lX, ", x, y, RC2I(B,x,y));
+			snprintf(buffer, 64, "B[%lu][%lu]=0x%016lX, ", x, y, RC2I(B,x,y));
 			str += buffer;
 		}
 		str += "\n";
