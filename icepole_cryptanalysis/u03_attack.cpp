@@ -746,4 +746,5 @@ std::string block2text(const u_int64_t * B)
 		}
 		str += "\n";
 	}
+	return str;
 }
