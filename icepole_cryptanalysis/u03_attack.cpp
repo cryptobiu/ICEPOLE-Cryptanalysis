@@ -708,14 +708,17 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 				max_dev = dev;
 				max_dev_counter_index = i;
 			}
-			log4cpp::Category::getInstance(j->locat).notice("%s: id=%u; ctr1[%lu]=%lu; ctr2[%lu]=%lu.", __FUNCTION__, j->id, i, j->ctr_1[i], i, j->ctr_2[i]);
+			log4cpp::Category::getInstance(j->locat).notice("%s: id=%u; ctr1[%lu]=%lu; ctr2[%lu]=%lu.",
+					__FUNCTION__, j->id, i, j->ctr_1[i], i, j->ctr_2[i]);
 		}
 
-		u_int64_t v0v1 = max_dev_counter_index;
-		log4cpp::Category::getInstance(j->locat).notice("%s: selected v0v1 = %lu; v0 = %lu; v1 = %lu.", __FUNCTION__, v0v1, (v0v1 & 0x10) >> 1, (v0v1 & 0x1));
+		u_int64_t v[2];
+		v[0] = (max_dev_counter_index & 0x10)? 1: 0;
+		v[1] = (max_dev_counter_index & 0x01)? 1: 0;
+		log4cpp::Category::getInstance(j->locat).notice("%s: selected ctr-idx = %lu; v0 = %lu; v1 = %lu.",
+				__FUNCTION__, max_dev_counter_index, v[0], v[1]);
 
-		u_int64_t v0 = (v0v1 & 0x10) >> 1;
-		U3 |= left_rotate((v0 ^ 1), 31 + j->id);
+		U3 |= left_rotate((v[0] ^ 1), 31 + j->id);
 	}
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
 
