@@ -38,6 +38,7 @@ u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t input_bit);
 size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
+std::string block2text(const u_int64_t * B);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -509,28 +510,21 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 	for(size_t i = 0; i < 8; ++i)
 	{
 		struct __row_t current_row = rows[i];
-		current_row.z = left_rotate(current_row.z, id);
+		current_row.z = (current_row.z + id)%64;
 		//CHECKBIT(current_row.x, current_row.z, row_bits, input_bit, F_xor_res)
 
 		row_bits = get_row_bits(P_perm_output, current_row.x, current_row.z);
 		input_bit = 0;
+		std::string str = block2text(P_perm_output);
 		if(lookup_Sbox_input_bit(row_bits, current_row.y, input_bit))
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: lookup_Sbox_input_bit() success; row_bits=%02X; Om=[%lu][%lu][%lu]; input_bit=%02X; %s",
+					__FUNCTION__, row_bits, current_row.x, current_row.y, current_row.z, input_bit, str.c_str());
 			F_xor_res ^= input_bit;
+		}
 		else
 		{
-			char buffer[32];
-			std::string str;
-			str += "P_perm_output=\n";
-			for(size_t k = 0; k < 4; ++k)
-			{
-				for(size_t l = 0; l < 4; ++l)
-				{
-					snprintf(buffer, 32, "0x%016lX, ", RC2I(P_perm_output,k,l));
-					str += buffer;
-				}
-				str += "\n";
-			}
-			log4cpp::Category::getInstance(logcat).debug("%s: lookup_Sbox_input_bit() failure; row_bits=%02X; row=[%lu][%lu][%lu]; %s",
+			log4cpp::Category::getInstance(logcat).debug("%s: lookup_Sbox_input_bit() failure; row_bits=%02X; Om=[%lu][%lu][%lu]; %s",
 					__FUNCTION__, row_bits, current_row.x, current_row.y, current_row.z, str.c_str());
 
 			return false;
@@ -734,4 +728,20 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 	}
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
 
+}
+
+std::string block2text(const u_int64_t * B)
+{
+	std::string str;
+	char buffer[32];
+	str += "block=\n";
+	for(size_t x = 0; x < 4; ++x)
+	{
+		for(size_t y = 0; y < 4; ++y)
+		{
+			snprintf(buffer, 32, "B[%lu][%lu]=0x%016lX, ", x, y, RC2I(B,x,y));
+			str += buffer;
+		}
+		str += "\n";
+	}
 }
