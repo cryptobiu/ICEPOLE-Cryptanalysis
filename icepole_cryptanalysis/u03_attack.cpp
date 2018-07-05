@@ -4,6 +4,7 @@
 #include <semaphore.h>
 #include <memory.h>
 #include <errno.h>
+#include <math.h>
 
 #include <string>
 
@@ -702,9 +703,7 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 		double max_dev = 0.0, dev;
 		for(size_t i = 0; i < 4; ++i)
 		{
-			dev = 0.5;
-			if(0 != j->ctr_1[i])
-				dev = abs( ( double(j->ctr_2[i]) / double(j->ctr_1[i]) ) - 0.5 );
+			dev = (0 != j->ctr_1[i])? fabs( ( double(j->ctr_2[i]) / double(j->ctr_1[i]) ) - 0.5 ): 0.0;
 
 			log4cpp::Category::getInstance(j->locat).debug("%s: ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.03f;",
 					__FUNCTION__, i, j->ctr_1[i], i, j->ctr_2[i], dev);
