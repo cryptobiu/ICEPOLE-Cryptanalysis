@@ -697,6 +697,11 @@ size_t lookup_counter_bits(const u_int64_t * C, const size_t id)
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
 {
 	U3 = 0;
+	U0 = 0;
+
+	u_int64_t v[64][2];
+	memset(v, 0, 64 * 2 * sizeof(u_int64_t));
+
 	for(std::vector<u03_attacker_t>::const_iterator j = atckr_prms.begin(); j != atckr_prms.end(); ++j)
 	{
 		size_t max_dev_counter_index = 4;
@@ -717,17 +722,21 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 		log4cpp::Category::getInstance(j->locat).debug("%s: selected ctr = %lu.",
 				__FUNCTION__, max_dev_counter_index);
 
-		u_int64_t v[2];
-		v[0] = (max_dev_counter_index & 0x2)? 1: 0;
-		v[1] = (max_dev_counter_index & 0x1)? 1: 0;
+		v[j->id][0] = (max_dev_counter_index & 0x2)? 1: 0;
+		v[j->id][1] = (max_dev_counter_index & 0x1)? 1: 0;
 
 		log4cpp::Category::getInstance(j->locat).notice("%s: selected ctr-idx = %lu; v0 = %lu; v1 = %lu.",
-				__FUNCTION__, max_dev_counter_index, v[0], v[1]);
+				__FUNCTION__, max_dev_counter_index, v[j->id][0], v[j->id][1]);
 
-		U3 |= left_rotate((v[0] ^ 1), 31 + j->id);
+		U3 |= left_rotate((v[j->id][0] ^ 1), 31 + j->id);
 	}
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
 
+	for(std::vector<u03_attacker_t>::const_iterator j = atckr_prms.begin(); j != atckr_prms.end(); ++j)
+	{
+		U0 |= ( U3 & left_rotate(1, 49 + j->id) ) ^ left_rotate(v[j->id][1], 49 + j->id);
+	}
+	log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U0);
 }
 
 std::string block2text(const u_int64_t * B)
