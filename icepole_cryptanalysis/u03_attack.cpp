@@ -348,7 +348,28 @@ void * u03_attacker(void * arg)
 
 int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id)
 {
+	/*
+	 * Init:
+	 * Start by encrypting a plaintext block 0f 0s.
+	 * Xor the result cyphertext with the plaintext to get the init-block.
+	 * ** Add an icepole hack to get the init-block 5th column for these
+	 * are U0,1,2,3 that you will eventually guess.
+	 * *** Mind the padding modifies two bits in the 5th column, check the article for details.
+	 *
+	 * Use init_state to get the init block!!!
+	 *
+	 *
+	 * To generate the input:
+	 * Generate a random P1 and check the constraints below on P1 ^ init-block.
+	 *
+	 */
+
+
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
+
+	//Temp1 = Xor P1 with Init-Block!
+	//Check the 4 constraints on Temp1,
+	//If a constraint fails - fix P1.
 
 	{	//set 1st constraint
 		/*
@@ -428,6 +449,8 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 			RC2I(P1,3,3) ^= mask;
 	}
 
+	//Continue with P1 - discard Temp1.
+
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
 
 	/*
@@ -470,6 +493,7 @@ int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t *
 	{
 		for(int y = 0; y < 4; ++y)
 		{
+			//Verify P 2nd block is zeros so C 2nd block cab be taken as is!!
 			RC2I(P_perm_output,x,y) = RC2I(P_2nd_block,x,y) ^ RC2I(C_2nd_block,x,y);
 		}
 	}
@@ -737,6 +761,8 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 		U0 |= ( U3 & left_rotate(1, 49 + j->id) ) ^ left_rotate(v[j->id][1], 49 + j->id);
 	}
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U0);
+
+	//Check U0 & U3 against the init block.
 }
 
 std::string block2text(const u_int64_t * B)
