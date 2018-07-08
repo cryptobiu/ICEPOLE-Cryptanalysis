@@ -3,13 +3,7 @@
 
 extern "C"
 {
-	int init_token(void ** token, const unsigned char * key, const unsigned char * iv);
-
-	int crypto_aead_encrypt_s(
-		void * token,
-		unsigned char *c,unsigned long long *clen,
-		const unsigned char *m,unsigned long long mlen,
-		const unsigned char *ad,unsigned long long adlen );
+	int init_token(void * init_state, const unsigned char * key, const unsigned char * iv);
 
 	int crypto_aead_encrypt(
 		unsigned char *c,unsigned long long *clen,

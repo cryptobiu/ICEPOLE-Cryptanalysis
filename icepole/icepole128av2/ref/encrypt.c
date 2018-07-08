@@ -3,61 +3,10 @@
 //#include "crypto_aead.h"
 #include "icepole.h"
 
-int init_token(void ** token, const unsigned char * key, const unsigned char * iv)
+int init_token(void * init_state, const unsigned char * key, const unsigned char * iv)
 {
-	*token = malloc(sizeof(ICESTATE));
-	initState128a(*((ICESTATE*)(*token)), key, iv);
+	initState128a(*((ICESTATE*)(init_state)), key, iv);
 	return 0;
-}
-
-int crypto_aead_encrypt_s(
-	void * token,
-	unsigned char *c,unsigned long long *clen,
-	const unsigned char *m,unsigned long long mlen,
-	const unsigned char *ad,unsigned long long adlen )
-{
-	ICESTATE * pS = (ICESTATE *)token;
-    unsigned int frameBit;
-
-    /* ciphertext length is plaintext len + size of tag and nsec */
-    *clen = mlen + ICEPOLETAGLEN;
-
-    /* secret message number is of zero length */
-    processDataBlock(*pS, NULL, NULL, 0, 0);
-
-    /* process auth-only associated data blocks */
-    do {
-        unsigned long long blocklen = ICEPOLEDATABLOCKLEN;
-        frameBit = (adlen <= blocklen ? 1 : 0); /* is it the last block? */
-        if (adlen < blocklen) {
-            blocklen = adlen;
-        }
-        /* apply the permutation to the state */
-        P6(*pS,*pS);
-        /* absorb a data block */
-        processDataBlock(*pS, ad, NULL, blocklen, frameBit);
-        ad += blocklen;
-        adlen -= blocklen;
-    } while (adlen > 0);
-
-    /* process plaintext blocks to get the ciphertext */
-    do {
-        unsigned long long blocklen = ICEPOLEDATABLOCKLEN;
-        frameBit = (mlen <=blocklen ? 0 : 1);
-        if (mlen < blocklen) {
-            blocklen = mlen;
-        }
-        /* apply the permutation to the state */
-        P6(*pS,*pS);
-        /* absorb a data block and produce a ciphertext block */
-        processDataBlock(*pS, m, &c, blocklen, frameBit);
-        m += blocklen;
-        mlen -= blocklen;
-    } while (mlen > 0);
-
-    /* store authentication tag at the end of the ciphertext */
-    generateTag(*pS, c);
-    return 0;
 }
 
 int crypto_aead_encrypt(
