@@ -49,7 +49,7 @@ std::string block2text(const u_int64_t * B);
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 100000000;//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 25000;//16029384739;
 
 typedef struct
 {
@@ -164,11 +164,21 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 							log4cpp::Category::getInstance(logcat).notice("%s: actual U0 = 0x%016lX.", __FUNCTION__, U_column[0]);
 							log4cpp::Category::getInstance(logcat).notice("%s: actual U3 = 0x%016lX.", __FUNCTION__, U_column[3]);
 
-							u_int64_t u3cmp = ~(U3 ^ U_column[3]);
-							size_t eq_bit_cnt = 0;
-							for(u_int64_t m = 0x1; m != 0; m <<= 1)
-								if(m & u3cmp) eq_bit_cnt++;
-							log4cpp::Category::getInstance(locat).notice("%s: correct guessed bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+							{
+								u_int64_t u3cmp = ~(U3 ^ U_column[3]);
+								size_t eq_bit_cnt = 0;
+								for(u_int64_t m = 0x1; m != 0; m <<= 1)
+									if(m & u3cmp) eq_bit_cnt++;
+								log4cpp::Category::getInstance(locat).notice("%s: correct guessed U3 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+							}
+
+							{
+								u_int64_t u0cmp = ~(U0 ^ U_column[0]);
+								size_t eq_bit_cnt = 0;
+								for(u_int64_t m = 0x1; m != 0; m <<= 1)
+									if(m & u0cmp) eq_bit_cnt++;
+								log4cpp::Category::getInstance(locat).notice("%s: correct guessed U0 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+							}
 
 							event_del(timer_evt);
 							log4cpp::Category::getInstance(locat).debug("%s: the timer event was removed.", __FUNCTION__);
@@ -507,7 +517,7 @@ int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t *
 	*/
 
 	//P_2nd_block is all zeros hence P_2nd_block ^ C_2nd_block = C_2nd_block!!
-	memcpy(P_perm_output, C_2nd_block, BLONG_SIZE);
+	memcpy(P_perm_output, C_2nd_block, BLOCK_SIZE);
 
 	return 0;
 }
@@ -545,6 +555,7 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 
 		row_bits = get_row_bits(P_perm_output, current_row.x, current_row.z);
 		input_bit = 0;
+
 		if(lookup_Sbox_input_bit(row_bits, current_row.y, input_bit))
 			F_xor_res ^= input_bit;
 		else
