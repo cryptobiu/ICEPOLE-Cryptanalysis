@@ -49,7 +49,7 @@ std::string block2text(const u_int64_t * B);
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 5550000000;//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 100000000;//16029384739;
 
 typedef struct
 {
