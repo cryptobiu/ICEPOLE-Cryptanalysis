@@ -24,13 +24,14 @@ typedef struct
 	sem_t * run_flag;
 	u_int64_t * samples_done;
 	u_int8_t * key, * iv;
+	u_int64_t * init_block;
 	u_int64_t ctr_1[4], ctr_2[4];
 }u03_attacker_t;
 
 void sigint_cb(evutil_socket_t, short, void *);
 void timer_cb(evutil_socket_t, short, void *);
 void * u03_attacker(void *);
-int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id);
+int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id, const u_int64_t * init_block);
 u_int64_t left_rotate(u_int64_t v, size_t r);
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
@@ -66,6 +67,9 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 
 	u_int64_t * samples_done = new u_int64_t[u03_thread_count];
 	memset(samples_done, 0, u03_thread_count * sizeof(u_int64_t));
+
+	u_int64_t init_state_block[4*5];
+	init_token((void *)init_state_block, key, iv);
 
 	sem_t run_flag;
 	if(0 == sem_init(&run_flag, 0, 1))
@@ -110,6 +114,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].samples_done = samples_done + i;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
+								atckr_prms[i].init_block = init_state_block;
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker, (void *)(atckr_prms.data() + i))))
@@ -152,6 +157,14 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 							log4cpp::Category::getInstance(locat).notice("%s: all u03 attacker threads are joined.", __FUNCTION__);
 
 							guess_work(atckr_prms, U0, U3, locat);
+
+							//Check U0 & U3 against the init block.
+							u_int64_t * U_column = init_state_block + BLONG_SIZE;
+							u_int64_t u3cmp = ~(U3 ^ U_column[3]);
+							size_t eq_bit_cnt = 0;
+							for(u_int64_t m = 0x1; m != 0; m <<= 1)
+								if(m & u3cmp) eq_bit_cnt++;
+							log4cpp::Category::getInstance(locat).notice("%s: correct guessed bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 
 							event_del(timer_evt);
 							log4cpp::Category::getInstance(locat).debug("%s: the timer event was removed.", __FUNCTION__);
@@ -260,7 +273,7 @@ void * u03_attacker(void * arg)
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
 	{
-		generate_inputs(P1, P2, prg, prm->id);
+		generate_inputs(P1, P2, prg, prm->id, prm->init_block);
 
 		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
@@ -346,30 +359,16 @@ void * u03_attacker(void * arg)
 	return NULL;
 }
 
-int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id)
+int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id, const u_int64_t * init_block)
 {
-	/*
-	 * Init:
-	 * Start by encrypting a plaintext block 0f 0s.
-	 * Xor the result cyphertext with the plaintext to get the init-block.
-	 * ** Add an icepole hack to get the init-block 5th column for these
-	 * are U0,1,2,3 that you will eventually guess.
-	 * *** Mind the padding modifies two bits in the 5th column, check the article for details.
-	 *
-	 * Use init_state to get the init block!!!
-	 *
-	 *
-	 * To generate the input:
-	 * Generate a random P1 and check the constraints below on P1 ^ init-block.
-	 *
-	 */
-
-
+	//Generation of random bytes in P1
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
 
-	//Temp1 = Xor P1 with Init-Block!
-	//Check the 4 constraints on Temp1,
-	//If a constraint fails - fix P1.
+	//XOR of P1 with the icepole init block into P1_ib_xor
+	u_int64_t P1_ib_xor[BLONG_SIZE];
+	for(size_t i = 0; i < 4; ++i)
+		for(size_t j = 0; j < 4; ++j)
+			RC2I(P1_ib_xor,i,j) = RC2I(P1,i,j) ^ RC2I(init_block,i,j);
 
 	{	//set 1st constraint
 		/*
@@ -383,11 +382,11 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		*/
 		u_int64_t mask = 0x0000000000000010;
 		if (0 == (
-					(RC2I(P1,0,1) & mask) ^
-					(RC2I(P1,1,0) & mask) ^
-					(RC2I(P1,2,1) & mask) ^
-					(RC2I(P1,3,0) & mask) ^
-					(RC2I(P1,3,2) & mask)))
+					(RC2I(P1_ib_xor,0,1) & mask) ^
+					(RC2I(P1_ib_xor,1,0) & mask) ^
+					(RC2I(P1_ib_xor,2,1) & mask) ^
+					(RC2I(P1_ib_xor,3,0) & mask) ^
+					(RC2I(P1_ib_xor,3,2) & mask)))
 		RC2I(P1,3,2) ^= mask;
 	}
 
@@ -403,11 +402,11 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		*/
 		u_int64_t mask = 0x0000000800000000;
 		if(0 == (
-					(RC2I(P1,0,1) & mask) ^
-					(RC2I(P1,1,0) & mask) ^
-					(RC2I(P1,2,1) & mask) ^
-					(RC2I(P1,3,0) & mask) ^
-					(RC2I(P1,3,2) & mask)))
+					(RC2I(P1_ib_xor,0,1) & mask) ^
+					(RC2I(P1_ib_xor,1,0) & mask) ^
+					(RC2I(P1_ib_xor,2,1) & mask) ^
+					(RC2I(P1_ib_xor,3,0) & mask) ^
+					(RC2I(P1_ib_xor,3,2) & mask)))
 			RC2I(P1,3,2) ^= mask;
 	}
 
@@ -423,10 +422,10 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		*/
 		u_int64_t mask = 0x0000000200000000;
 		if(1 == (
-					(RC2I(P1,0,2) & mask) ^
-					(RC2I(P1,1,3) & mask) ^
-					(RC2I(P1,2,3) & mask) ^
-					(RC2I(P1,3,3) & mask)))
+					(RC2I(P1_ib_xor,0,2) & mask) ^
+					(RC2I(P1_ib_xor,1,3) & mask) ^
+					(RC2I(P1_ib_xor,2,3) & mask) ^
+					(RC2I(P1_ib_xor,3,3) & mask)))
 			RC2I(P1,3,3) ^= mask;
 	}
 
@@ -442,15 +441,14 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		 */
 		u_int64_t mask = 0x0000000000000001;
 		if(1 == (
-					(RC2I(P1,0,2) & mask) ^
-					(RC2I(P1,1,3) & mask) ^
-					(RC2I(P1,2,3) & mask) ^
-					(RC2I(P1,3,3) & mask)))
+					(RC2I(P1_ib_xor,0,2) & mask) ^
+					(RC2I(P1_ib_xor,1,3) & mask) ^
+					(RC2I(P1_ib_xor,2,3) & mask) ^
+					(RC2I(P1_ib_xor,3,3) & mask)))
 			RC2I(P1,3,3) ^= mask;
 	}
 
-	//Continue with P1 - discard Temp1.
-
+	//set the 2nd block of P1 to zeroes
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
 
 	/*
@@ -462,6 +460,9 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		0x1, 0x0, 0x1, 0x0, //0x0,
 	};
 	*/
+
+	//copy P1 onto P2 and modify
+	//the bits by the conversion mask
 	memcpy(P2, P1, 2 * BLOCK_SIZE);
 	RC2I(P2,0,2) ^= 0x1;
 	RC2I(P2,1,0) ^= 0x1;
@@ -473,6 +474,7 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 	RC2I(P2,3,0) ^= 0x1;
 	RC2I(P2,3,2) ^= 0x1;
 
+	//shift the input in accordance with the thread id
 	for(size_t i = 0; i < BLONG_SIZE; ++i)
 	{
 		P1[i] = left_rotate(P1[i], id);
@@ -489,22 +491,22 @@ u_int64_t left_rotate(u_int64_t v, size_t r)
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output)
 {
 	const u_int64_t * P_2nd_block = (P+BLONG_SIZE), * C_2nd_block = (C+BLONG_SIZE);
+
+	/* Actual implementation
 	for(int x = 0; x < 4; ++x)
 	{
 		for(int y = 0; y < 4; ++y)
 		{
-			//Verify P 2nd block is zeros so C 2nd block cab be taken as is!!
 			RC2I(P_perm_output,x,y) = RC2I(P_2nd_block,x,y) ^ RC2I(C_2nd_block,x,y);
 		}
 	}
+	*/
+
+	//P_2nd_block is all zeros hence P_2nd_block ^ C_2nd_block = C_2nd_block!!
+	memcpy(P_perm_output, C_2nd_block, BLONG_SIZE);
+
 	return 0;
 }
-/*
-#define CHECKBIT(X,Z,rb,ib,xr) \
-{ rb = get_row_bits(P_perm_output, X, Z); ib = 0; \
-if(lookup_Sbox_input_bit(rb, 0, ib))  xr ^= ib; \
-else return false; }
-*/
 
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat)
 {
@@ -536,7 +538,6 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 	{
 		struct __row_t current_row = rows[i];
 		current_row.z = (current_row.z + id)%64;
-		//CHECKBIT(current_row.x, current_row.z, row_bits, input_bit, F_xor_res)
 
 		row_bits = get_row_bits(P_perm_output, current_row.x, current_row.z);
 		input_bit = 0;
@@ -761,8 +762,6 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 		U0 |= ( U3 & left_rotate(1, 49 + j->id) ) ^ left_rotate(v[j->id][1], 49 + j->id);
 	}
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U0);
-
-	//Check U0 & U3 against the init block.
 }
 
 std::string block2text(const u_int64_t * B)
