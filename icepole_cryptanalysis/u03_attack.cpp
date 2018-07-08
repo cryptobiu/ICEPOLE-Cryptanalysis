@@ -160,6 +160,10 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 
 							//Check U0 & U3 against the init block.
 							u_int64_t * U_column = init_state_block + BLONG_SIZE;
+
+							log4cpp::Category::getInstance(logcat).notice("%s: actual U0 = 0x%016lX.", __FUNCTION__, U_column[0]);
+							log4cpp::Category::getInstance(logcat).notice("%s: actual U3 = 0x%016lX.", __FUNCTION__, U_column[3]);
+
 							u_int64_t u3cmp = ~(U3 ^ U_column[3]);
 							size_t eq_bit_cnt = 0;
 							for(u_int64_t m = 0x1; m != 0; m <<= 1)
