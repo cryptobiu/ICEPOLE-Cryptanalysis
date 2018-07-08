@@ -142,13 +142,13 @@ int kappa5(unsigned char * p)
 
 int pi_rho_mu(const unsigned char * c, unsigned char * c_)
 {
-	//TODO: reverse the order to pi(rho(mu(c)))!!
+	//Op-order: c_ = pi(rho(mu(c)))!!
 
 	ICESTATE Ss, Sp, Sr, Sm;
 	memcpy(Ss, c, 16*sizeof(u_int64_t));
-	Pi(Sp, Ss);
-	Rho(Sr, Sp);
-	Mu(Sm, Sr);
-	memcpy(c_, Sm, 16*sizeof(u_int64_t));
+	Mu(Sm, Ss);
+	Rho(Sr, Sm);
+	Pi(Sp, Sr);
+	memcpy(c_, Sp, 16*sizeof(u_int64_t));
 	return 0;
 }
