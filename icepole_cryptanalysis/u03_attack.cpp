@@ -49,7 +49,7 @@ std::string block2text(const u_int64_t * B);
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 800000000;//16029384739;
 
 typedef struct
 {
@@ -750,7 +750,7 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 		{
 			dev = (0 != j->ctr_1[i])? fabs( ( double(j->ctr_2[i]) / double(j->ctr_1[i]) ) - 0.5 ): 0.0;
 
-			log4cpp::Category::getInstance(j->locat).debug("%s: ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.03f;",
+			log4cpp::Category::getInstance(j->locat).notice("%s: ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.03f;",
 					__FUNCTION__, i, j->ctr_1[i], i, j->ctr_2[i], dev);
 
 			if(max_dev < dev)
