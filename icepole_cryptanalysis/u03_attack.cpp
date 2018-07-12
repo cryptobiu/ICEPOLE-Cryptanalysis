@@ -795,3 +795,22 @@ std::string block2text(const u_int64_t * B)
 	}
 	return str;
 }
+
+
+/*
+ * 1. --- // Fix the lookup table by the last document's version.
+ *
+ * 2. The init block should be saved from the encrypt; after handling the ad and before the plaintext.
+ * Run a dummy encrypt at the beginning to get it - XOR the dummy plaintext with its cyphertext to verify.
+ *
+ * 3. Implement an encrypt version that saves the icepole state from inside P6, from round4 + Mu, Rho & Pi.
+ * (that's P6 minus the last Kappa and Psi).
+ *
+ * 4. The saved state from 3 is the original 'looked up' state. So now F1 and F2 can be calculated
+ * directly. Use the __row_t for mask, and calculate F1 and F2 without filtering.
+ *
+ * 5. last_Sbox_lookup_filter is not needed. Update the counters accordingly.
+ *
+ * 6. Perform 2^22 tests and compare.
+ *
+ */
