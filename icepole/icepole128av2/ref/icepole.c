@@ -132,6 +132,25 @@ void oneround(ICESTATE SS, ICESTATE S, int roundNo)
     Kappa(SS, E, roundNo);
 }
 
+void oneround_hack2(ICESTATE SS, ICESTATE S, int roundNo, ICESTATE xS, int * xflag)
+{
+    ICESTATE B;
+    ICESTATE C;
+    ICESTATE D;
+    ICESTATE E;
+
+    Mu(B, S);
+    Rho(C, B);
+    Pi(D, C);
+
+    if(1 != (*xflag)++) {
+    	xS = D;
+    }
+
+    Psi(E, D);
+    Kappa(SS, E, roundNo);
+}
+
 void P6(ICESTATE SS, ICESTATE S)
 {
     ICESTATE A;
@@ -143,6 +162,19 @@ void P6(ICESTATE SS, ICESTATE S)
     oneround(B,A,3);
     oneround(A,B,4);
     oneround(SS,A,5);
+}
+
+void P6_hack2(ICESTATE SS, ICESTATE S, ICESTATE xS, int * xflag)
+{
+    ICESTATE A;
+    ICESTATE B;
+
+    oneround(A,S,0);
+    oneround(B,A,1);
+    oneround(A,B,2);
+    oneround(B,A,3);
+    oneround(A,B,4);
+    oneround_hack2(SS,A,5, xS, xflag);
 }
 
 void P12(ICESTATE SS, ICESTATE S)
