@@ -41,6 +41,8 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 std::string block2text(const u_int64_t * B);
+void * u03_attacker_hack(void * arg);
+u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -49,7 +51,7 @@ std::string block2text(const u_int64_t * B);
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 800000000;//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 4096;//16029384739;
 
 typedef struct
 {
@@ -117,7 +119,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].init_block = init_block;
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
-								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker, (void *)(atckr_prms.data() + i))))
+								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker_hack, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
 									log4cpp::Category::getInstance(locat).error("%s: pthread_create() failed with error %d : [%s]",
@@ -809,3 +811,94 @@ std::string block2text(const u_int64_t * B)
  * 6. Perform 2^22 tests and compare.
  *
  */
+
+void * u03_attacker_hack(void * arg)
+{
+	u03_attacker_t * prm = (u03_attacker_t *)arg;
+
+	char atckr_locat[32];
+	snprintf(atckr_locat, 32, "%s.%lu", prm->locat.c_str(), prm->id);
+	prm->locat = atckr_locat;
+
+	aes_prg prg;
+	if(0 != prg.init(BLOCK_SIZE))
+	{
+		log4cpp::Category::getInstance(prm->locat).error("%s: prg.init() failure", __FUNCTION__);
+		return NULL;
+	}
+
+	int run_flag_value;
+	if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
+	{
+		int errcode = errno;
+		char errmsg[256];
+		log4cpp::Category::getInstance(prm->locat).error("%s: sem_getvalue() failed with error %d : [%s]",
+				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+		exit(__LINE__);
+	}
+
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
+	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+
+	u_int64_t x_state[4*5];
+	u_int8_t F1 = 0, F2 = 0;
+
+	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
+	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
+	{
+		generate_inputs(P1, P2, prg, prm->id, prm->init_block);
+
+		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
+		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
+
+		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+		crypto_aead_encrypt_hack2((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state);
+		F1 = xor_state_bits(x_state, prm->id);
+
+		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+		crypto_aead_encrypt_hack2((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state);
+		F1 = xor_state_bits(x_state, prm->id);
+
+		size_t n = lookup_counter_bits(C1, prm->id);
+
+		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
+		 */
+		prm->ctr_1[n]++;
+
+		/*
+		 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
+		 */
+		if(F1 == F2)
+			prm->ctr_2[n]++;
+
+		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
+		{
+			int errcode = errno;
+			char errmsg[256];
+			log4cpp::Category::getInstance(prm->locat).error("%s: sem_getvalue() failed with error %d : [%s]",
+					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+			exit(__LINE__);
+		}
+	}
+
+	log4cpp::Category::getInstance(prm->locat).debug("%s: exit.", __FUNCTION__);
+
+	return NULL;
+}
+
+u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id)
+{
+	static const struct __bit_t { size_t x; size_t y; size_t z; } bits[8] = { {0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
+																			  {2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
+	u_int8_t result = 0;
+	for(size_t i = 0; i < 8; ++i)
+	{
+		struct __bit_t current_bit = bits[i];
+		current_bit.z = (current_bit.z + id)%64;
+
+		result ^= get_bit(x_state, current_bit.x, current_bit.y, current_bit.z);
+	}
+
+	return result;
+}
