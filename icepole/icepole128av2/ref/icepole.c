@@ -143,7 +143,7 @@ void oneround_hack2(ICESTATE SS, ICESTATE S, int roundNo, ICESTATE xS, int * xfl
     Rho(C, B);
     Pi(D, C);
 
-    if(1 != (*xflag)++) {
+    if(1 == (*xflag)++) {
     	xS = D;
     }
 
