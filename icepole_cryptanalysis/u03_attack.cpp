@@ -738,6 +738,8 @@ size_t lookup_counter_bits(const u_int64_t * C, const size_t id)
 
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
 {
+	//counter-1 [ [3][1][41] , [3][3][41] ] ==> counter-1 [ v0 , v1 ]
+
 	U3 = 0;
 	U0 = 0;
 
@@ -858,7 +860,7 @@ void * u03_attacker_hack(void * arg)
 
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt_hack2((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state);
-		F1 = xor_state_bits(x_state, prm->id);
+		F2 = xor_state_bits(x_state, prm->id);
 
 		size_t n = lookup_counter_bits(C1, prm->id);
 

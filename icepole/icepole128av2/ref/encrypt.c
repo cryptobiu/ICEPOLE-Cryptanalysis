@@ -145,10 +145,14 @@ int pi_rho_mu(const unsigned char * c, unsigned char * c_)
 	//Op-order: c_ = pi(rho(mu(c)))!!
 
 	ICESTATE Ss, Sp, Sr, Sm;
+
+	memset(&Ss, 0, sizeof(ICESTATE));
 	memcpy(Ss, c, 16*sizeof(u_int64_t));
+
 	Mu(Sm, Ss);
 	Rho(Sr, Sm);
 	Pi(Sp, Sr);
+
 	memcpy(c_, Sp, 16*sizeof(u_int64_t));
 	return 0;
 }
