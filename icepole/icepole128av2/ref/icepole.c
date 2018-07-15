@@ -144,7 +144,12 @@ void oneround_hack2(ICESTATE SS, ICESTATE S, int roundNo, ICESTATE xS, int * xfl
     Pi(D, C);
 
     if(1 == (*xflag)++) {
-    	xS = D;
+        unsigned int x,y;
+        for(x = 0; x < 4; ++x) {
+            for(y = 0; y < 5; ++y) {
+                xS[x][y] = D[x][y];
+            }
+        }
     }
 
     Psi(E, D);

@@ -847,8 +847,6 @@ void * u03_attacker_hack(void * arg)
 	u_int64_t x_state_2[4*5];
 	u_int8_t F1 = 0, F2 = 0;
 
-	size_t debug_count = 0;
-
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
 	{
@@ -864,9 +862,6 @@ void * u03_attacker_hack(void * arg)
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt_hack2((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state_2);
 		F2 = xor_state_bits(x_state_2, prm->id);
-
-		if(memcmp(x_state_1, x_state_2, 4*5*sizeof(u_int64_t)) == 0)
-			debug_count++;
 
 		size_t n = lookup_counter_bits(C1, prm->id);
 
@@ -891,8 +886,6 @@ void * u03_attacker_hack(void * arg)
 	}
 
 	log4cpp::Category::getInstance(prm->locat).debug("%s: exit.", __FUNCTION__);
-
-	log4cpp::Category::getInstance(prm->locat).debug("%s: %lu x states are equal.", __FUNCTION__, debug_count);
 
 	return NULL;
 }
