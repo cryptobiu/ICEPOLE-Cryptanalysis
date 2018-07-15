@@ -51,7 +51,7 @@ u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id);
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 4096;//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 100000000;//16029384739;
 
 typedef struct
 {
