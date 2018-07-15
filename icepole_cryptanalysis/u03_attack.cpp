@@ -616,14 +616,14 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 	case 0x4://0010
 		switch(input_bit_index)
 		{
-		case 0: input_bit = 0; return true;
+		case 1: input_bit = 0; return true;
 		default: return false;
 		}
 		break;
 	case 0x5://1010
 		switch(input_bit_index)
 		{
-		case 0: input_bit = 0; return true;
+		case 1: input_bit = 0; return true;
 		case 3: input_bit = 0; return true;
 		default: return false;
 		}
