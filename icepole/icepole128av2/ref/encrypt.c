@@ -152,3 +152,74 @@ int pi_rho_mu(const unsigned char * c, unsigned char * c_)
 	memcpy(c_, Sp, 16*sizeof(u_int64_t));
 	return 0;
 }
+
+int crypto_aead_encrypt_hack(
+	unsigned char * init_state,
+	const unsigned char *npub,
+	const unsigned char *k)
+{
+	unsigned char _c[16 + ICEPOLETAGLEN];
+	unsigned char *c = _c;
+	unsigned long long _clen = 0;
+	unsigned long long *clen = &_clen;
+
+	const unsigned char _m[16] = { 0 };
+	const unsigned char *m = _m;
+	unsigned long long mlen = 16;
+
+	const unsigned char *ad = NULL;
+	unsigned long long adlen = 0;
+
+	//---------------------------------------------------------------//
+
+    ICESTATE S;
+    unsigned int frameBit;
+
+    /* initialize the state with secret key and nonce */
+    initState128a(S, k, npub);
+
+    /* ciphertext length is plaintext len + size of tag and nsec */
+    *clen = mlen + ICEPOLETAGLEN;
+
+    /* secret message number is of zero length */
+    processDataBlock(S, NULL, NULL, 0, 0);
+
+    /* process auth-only associated data blocks */
+    do {
+        unsigned long long blocklen = ICEPOLEDATABLOCKLEN;
+        frameBit = (adlen <= blocklen ? 1 : 0); /* is it the last block? */
+        if (adlen < blocklen) {
+            blocklen = adlen;
+        }
+        /* apply the permutation to the state */
+        P6(S,S);
+        /* absorb a data block */
+        processDataBlock(S, ad, NULL, blocklen, frameBit);
+        ad += blocklen;
+        adlen -= blocklen;
+    } while (adlen > 0);
+
+    /* process plaintext blocks to get the ciphertext */
+    do {
+        unsigned long long blocklen = ICEPOLEDATABLOCKLEN;
+        frameBit = (mlen <=blocklen ? 0 : 1);
+        if (mlen < blocklen) {
+            blocklen = mlen;
+        }
+        /* apply the permutation to the state */
+        P6(S,S);
+
+        //here is the extraction point of the initialized state.
+        memcpy(init_state, S, 4*5*sizeof(u_int64_t));
+        return 0;
+
+        /* absorb a data block and produce a ciphertext block */
+        processDataBlock(S, m, &c, blocklen, frameBit);
+        m += blocklen;
+        mlen -= blocklen;
+    } while (mlen > 0);
+
+    /* store authentication tag at the end of the ciphertext */
+    generateTag(S, c);
+    return 0;
+}

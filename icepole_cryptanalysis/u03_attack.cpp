@@ -68,8 +68,8 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	u_int64_t * samples_done = new u_int64_t[u03_thread_count];
 	memset(samples_done, 0, u03_thread_count * sizeof(u_int64_t));
 
-	u_int64_t init_state_block[4*5];
-	init_token((void *)init_state_block, key, iv);
+	u_int64_t init_block[4*5];
+	crypto_aead_encrypt_hack((unsigned char *)init_block, key, iv);
 
 	sem_t run_flag;
 	if(0 == sem_init(&run_flag, 0, 1))
@@ -114,7 +114,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].samples_done = samples_done + i;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
-								atckr_prms[i].init_block = init_state_block;
+								atckr_prms[i].init_block = init_block;
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker, (void *)(atckr_prms.data() + i))))
@@ -159,7 +159,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 							guess_work(atckr_prms, U0, U3, locat);
 
 							//Check U0 & U3 against the init block.
-							u_int64_t * U_column = init_state_block + BLONG_SIZE;
+							u_int64_t * U_column = init_block + BLONG_SIZE;
 
 							log4cpp::Category::getInstance(logcat).notice("%s: actual U0 = 0x%016lX.", __FUNCTION__, U_column[0]);
 							log4cpp::Category::getInstance(logcat).notice("%s: actual U3 = 0x%016lX.", __FUNCTION__, U_column[3]);
@@ -798,11 +798,6 @@ std::string block2text(const u_int64_t * B)
 
 
 /*
- * 1. --- // Fix the lookup table by the last document's version.
- *
- * 2. The init block should be saved from the encrypt; after handling the ad and before the plaintext.
- * Run a dummy encrypt at the beginning to get it - XOR the dummy plaintext with its cyphertext to verify.
- *
  * 3. Implement an encrypt version that saves the icepole state from inside P6, from round4 + Mu, Rho & Pi.
  * (that's P6 minus the last Kappa and Psi).
  *

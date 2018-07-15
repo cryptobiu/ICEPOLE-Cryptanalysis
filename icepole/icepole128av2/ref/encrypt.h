@@ -21,6 +21,15 @@ extern "C"
 		const unsigned char *npub,
 		const unsigned char *k);
 
+	//-----------------------------------------------------------//
+
 	int kappa5(unsigned char * p);
+
 	int pi_rho_mu(const unsigned char * c, unsigned char * c_);
+
+	int crypto_aead_encrypt_hack(
+		unsigned char * init_state,
+		const unsigned char *npub,
+		const unsigned char *k);
+
 };
