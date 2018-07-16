@@ -27,17 +27,21 @@ extern "C"
 
 	int pi_rho_mu(const unsigned char * c, unsigned char * c_);
 
-	int crypto_aead_encrypt_hack(
-		unsigned char * init_state,
-		const unsigned char *npub,
-		const unsigned char *k);
-
-	int crypto_aead_encrypt_hack2(
+	int crypto_aead_encrypt_i(
 		unsigned char *c,unsigned long long *clen,
 		const unsigned char *m,unsigned long long mlen,
 		const unsigned char *ad,unsigned long long adlen,
 		const unsigned char *nsec,
 		const unsigned char *npub,
 		const unsigned char *k,
-		u_int64_t x_state[4*5]);
+		u_int64_t is[4][5]);
+
+	int crypto_aead_encrypt_hack(
+		unsigned char *c,unsigned long long *clen,
+		const unsigned char *m,unsigned long long mlen,
+		const unsigned char *ad,unsigned long long adlen,
+		const unsigned char *nsec,
+		const unsigned char *npub,
+		const unsigned char *k,
+		u_int64_t is[4][5]);
 };

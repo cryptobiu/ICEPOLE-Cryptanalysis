@@ -24,14 +24,14 @@ typedef struct
 	sem_t * run_flag;
 	u_int64_t * samples_done;
 	u_int8_t * key, * iv;
-	u_int64_t * init_block;
+	u_int64_t init_block[4][5];
 	u_int64_t ctr_1[4], ctr_2[4];
 }u03_attacker_t;
 
 void sigint_cb(evutil_socket_t, short, void *);
 void timer_cb(evutil_socket_t, short, void *);
 void * u03_attacker(void *);
-int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id, const u_int64_t * init_block);
+int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id, const u_int64_t init_block[4][5]);
 u_int64_t left_rotate(u_int64_t v, size_t r);
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
@@ -43,6 +43,7 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 std::string block2text(const u_int64_t * B);
 void * u03_attacker_hack(void * arg);
 u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id);
+void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -70,8 +71,8 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	u_int64_t * samples_done = new u_int64_t[u03_thread_count];
 	memset(samples_done, 0, u03_thread_count * sizeof(u_int64_t));
 
-	u_int64_t init_block[4*5];
-	crypto_aead_encrypt_hack((unsigned char *)init_block, key, iv);
+	u_int64_t init_block[4][5];
+	get_init_block(init_block, key, iv);
 
 	sem_t run_flag;
 	if(0 == sem_init(&run_flag, 0, 1))
@@ -116,7 +117,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].samples_done = samples_done + i;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
-								atckr_prms[i].init_block = init_block;
+								memcpy(atckr_prms[i].init_block, init_block, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker_hack, (void *)(atckr_prms.data() + i))))
@@ -161,13 +162,13 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 							guess_work(atckr_prms, U0, U3, locat);
 
 							//Check U0 & U3 against the init block.
-							u_int64_t * U_column = init_block + BLONG_SIZE;
+							//u_int64_t * U_column = (u_int64_t *)init_block + BLONG_SIZE;
 
-							log4cpp::Category::getInstance(logcat).notice("%s: actual U0 = 0x%016lX.", __FUNCTION__, U_column[0]);
-							log4cpp::Category::getInstance(logcat).notice("%s: actual U3 = 0x%016lX.", __FUNCTION__, U_column[3]);
+							log4cpp::Category::getInstance(logcat).notice("%s: actual U0 = 0x%016lX.", __FUNCTION__, init_block[0][4]);
+							log4cpp::Category::getInstance(logcat).notice("%s: actual U3 = 0x%016lX.", __FUNCTION__, init_block[3][4]);
 
 							{
-								u_int64_t u3cmp = ~(U3 ^ U_column[3]);
+								u_int64_t u3cmp = ~(U3 ^ init_block[3][4]);
 								size_t eq_bit_cnt = 0;
 								for(u_int64_t m = 0x1; m != 0; m <<= 1)
 									if(m & u3cmp) eq_bit_cnt++;
@@ -175,7 +176,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 							}
 
 							{
-								u_int64_t u0cmp = ~(U0 ^ U_column[0]);
+								u_int64_t u0cmp = ~(U0 ^ init_block[0][4]);
 								size_t eq_bit_cnt = 0;
 								for(u_int64_t m = 0x1; m != 0; m <<= 1)
 									if(m & u0cmp) eq_bit_cnt++;
@@ -375,7 +376,7 @@ void * u03_attacker(void * arg)
 	return NULL;
 }
 
-int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id, const u_int64_t * init_block)
+int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id, const u_int64_t init_block[4][5])
 {
 	//Generation of random bytes in P1
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
@@ -384,7 +385,7 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 	u_int64_t P1_ib_xor[BLONG_SIZE];
 	for(size_t i = 0; i < 4; ++i)
 		for(size_t j = 0; j < 4; ++j)
-			RC2I(P1_ib_xor,i,j) = RC2I(P1,i,j) ^ RC2I(init_block,i,j);
+			RC2I(P1_ib_xor,i,j) = RC2I(P1,i,j) ^ init_block[i][j];
 
 	{	//set 1st constraint
 		/*
@@ -856,12 +857,24 @@ void * u03_attacker_hack(void * arg)
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
-		crypto_aead_encrypt_hack2((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state_1);
+		crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, (u_int64_t (*)[5])x_state_1);
 		F1 = xor_state_bits(x_state_1, prm->id);
 
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
-		crypto_aead_encrypt_hack2((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state_2);
+		crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, (u_int64_t (*)[5])x_state_2);
 		F2 = xor_state_bits(x_state_2, prm->id);
+
+/*		{//init block verification
+			for(int i = 0; i < 4; ++i)
+			{
+				for(int j = 0; j < 4; ++j)
+				{
+					log4cpp::Category::getInstance(prm->locat).notice("%s: P1^C1[%d:%d] = %016lX", __FUNCTION__, i, j, RC2I(P1,i,j) ^ RC2I(C1,i,j));
+					log4cpp::Category::getInstance(prm->locat).notice("%s: P2^C2[%d:%d] = %016lX", __FUNCTION__, i, j, RC2I(P2,i,j) ^ RC2I(C2,i,j));
+					log4cpp::Category::getInstance(prm->locat).notice("%s: initb[%d:%d] = %016lX", __FUNCTION__, i, j, prm->init_block[i][j]);
+				}
+			}
+		}*/
 
 		size_t n = lookup_counter_bits(C1, prm->id);
 
@@ -905,3 +918,61 @@ u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id)
 
 	return result;
 }
+
+void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv)
+{
+	u_int8_t C[128+16];
+	memset(C, 0, 128+16);
+	unsigned long long clen = 128+16;
+
+	u_int8_t P[128] = { 0 };
+
+	u_int64_t is[4][5];
+	for(size_t i = 0; i < 4; ++i)
+		for(size_t j = 0; j < 5; ++j)
+			is[i][j] = 0;
+
+	crypto_aead_encrypt_i((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key, ib);
+}
+
+/*
+
+P^C[0][0]=0xD70D1D4E38595714
+P^C[0][1]=0xC9522A3FE713CD4B
+P^C[0][2]=0x202FF5705C142CF3
+P^C[0][3]=0x7C5430718EE8868B
+P^C[1][0]=0x5E5FDFBD725FB923
+P^C[1][1]=0xEA14E99D014CF99E
+P^C[1][2]=0xA15879EFF069B299
+P^C[1][3]=0xB36A4FFE824C398E
+P^C[2][0]=0x1E2DE62A326DF04B
+P^C[2][1]=0xC1EE321DDEDCD32B
+P^C[2][2]=0x4606FC818C329E6E
+P^C[2][3]=0xE4412ED389803DDE
+P^C[3][0]=0xACA8F5A68259FC88
+P^C[3][1]=0xB37E9F22C2E596BD
+P^C[3][2]=0x12FA2EF1B845C763
+P^C[3][3]=0x38A87A3813D3FC99
+
+is[0][0]=0xD70D1D4E38595714
+is[0][1]=0xC9522A3FE713CD4B
+is[0][2]=0x202FF5705C142CF3
+is[0][3]=0x7C5430718EE8868B
+is[1][0]=0x5E5FDFBD725FB923
+is[1][1]=0xEA14E99D014CF99E
+is[1][2]=0xA15879EFF069B299
+is[1][3]=0xB36A4FFE824C398E
+is[2][0]=0x1E2DE62A326DF04B
+is[2][1]=0xC1EE321DDEDCD32B
+is[2][2]=0x4606FC818C329E6E
+is[2][3]=0xE4412ED389803DDE
+is[3][0]=0xACA8F5A68259FC88
+is[3][1]=0xB37E9F22C2E596BD
+is[3][2]=0x12FA2EF1B845C763
+is[3][3]=0x38A87A3813D3FC99
+is[0][4]=0xFFEDFC54851730D5
+is[1][4]=0x9301658B3FBCC5C7
+is[2][4]=0xEA834B763DF9FBED
+is[3][4]=0x59DE9D0C1196F242
+
+ */

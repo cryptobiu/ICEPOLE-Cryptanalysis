@@ -157,25 +157,15 @@ int pi_rho_mu(const unsigned char * c, unsigned char * c_)
 	return 0;
 }
 
-int crypto_aead_encrypt_hack(
-	unsigned char * init_state,
+int crypto_aead_encrypt_i(
+	unsigned char *c,unsigned long long *clen,
+	const unsigned char *m,unsigned long long mlen,
+	const unsigned char *ad,unsigned long long adlen,
+	const unsigned char *nsec,
 	const unsigned char *npub,
-	const unsigned char *k)
+	const unsigned char *k,
+	u_int64_t is[4][5])
 {
-	unsigned char _c[16 + ICEPOLETAGLEN];
-	unsigned char *c = _c;
-	unsigned long long _clen = 0;
-	unsigned long long *clen = &_clen;
-
-	const unsigned char _m[16] = { 0 };
-	const unsigned char *m = _m;
-	unsigned long long mlen = 16;
-
-	const unsigned char *ad = NULL;
-	unsigned long long adlen = 0;
-
-	//---------------------------------------------------------------//
-
     ICESTATE S;
     unsigned int frameBit;
 
@@ -203,6 +193,8 @@ int crypto_aead_encrypt_hack(
         adlen -= blocklen;
     } while (adlen > 0);
 
+    int is_save = 1;
+
     /* process plaintext blocks to get the ciphertext */
     do {
         unsigned long long blocklen = ICEPOLEDATABLOCKLEN;
@@ -212,11 +204,13 @@ int crypto_aead_encrypt_hack(
         }
         /* apply the permutation to the state */
         P6(S,S);
-
-        //here is the extraction point of the initialized state.
-        memcpy(init_state, S, 4*5*sizeof(u_int64_t));
-        return 0;
-
+        if(0 != is_save)
+        {
+        	is_save = 0;
+        	for(int i = 0; i < 4; ++i)
+        		for(int j = 0; j < 5; ++j)
+        			is[i][j] = S[i][j];
+        }
         /* absorb a data block and produce a ciphertext block */
         processDataBlock(S, m, &c, blocklen, frameBit);
         m += blocklen;
@@ -228,14 +222,14 @@ int crypto_aead_encrypt_hack(
     return 0;
 }
 
-int crypto_aead_encrypt_hack2(
+int crypto_aead_encrypt_hack(
 	unsigned char *c,unsigned long long *clen,
 	const unsigned char *m,unsigned long long mlen,
 	const unsigned char *ad,unsigned long long adlen,
 	const unsigned char *nsec,
 	const unsigned char *npub,
 	const unsigned char *k,
-	u_int64_t x_state[4*5])
+	u_int64_t x_state[4][5])
 {
 	int xted = 0;
 
@@ -283,6 +277,8 @@ int crypto_aead_encrypt_hack2(
 
     /* store authentication tag at the end of the ciphertext */
     generateTag(S, c);
-    memcpy(x_state, xS, 4*5*sizeof(u_int64_t));
+	for(int i = 0; i < 4; ++i)
+		for(int j = 0; j < 5; ++j)
+			x_state[i][j] = xS[i][j];
     return 0;
 }
