@@ -866,7 +866,10 @@ void * u03_attacker_hack(void * arg)
 		F2 = xor_state_bits(x_state_2, prm->id);
 
 		if(log4cpp::Category::getInstance(prm->locat).isDebugEnabled())
+		{
 			validate_init_block(P1, C1, prm->init_block, prm->locat.c_str());
+			validate_init_block(P2, C2, prm->init_block, prm->locat.c_str());
+		}
 
 		size_t n = lookup_counter_bits(C1, prm->id);
 
@@ -933,9 +936,10 @@ void validate_init_block(const u_int64_t * P, const u_int64_t * C, u_int64_t ini
 	{
 		for(int j = 0; j < 4; ++j)
 		{
+			log4cpp::Category::getInstance(logcat).debug("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
 			if( ( RC2I(P,i,j) ^ RC2I(C,i,j) ) != init_block[i][j])
 			{
-				log4cpp::Category::getInstance(logcat).fatal("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
+				log4cpp::Category::getInstance(logcat).fatal("%s: mismatch @%d:%d!", __FUNCTION__, i, j);
 				exit(-1);
 			}
 		}
