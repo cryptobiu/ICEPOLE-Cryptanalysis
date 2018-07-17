@@ -44,6 +44,7 @@ std::string block2text(const u_int64_t * B);
 void * u03_attacker_hack(void * arg);
 u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id);
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
+void validate_init_block(const u_int64_t * P, const u_int64_t * C, u_int64_t init_block[4][5], const char * logcat);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -864,17 +865,8 @@ void * u03_attacker_hack(void * arg)
 		crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, (u_int64_t (*)[5])x_state_2);
 		F2 = xor_state_bits(x_state_2, prm->id);
 
-/*		{//init block verification
-			for(int i = 0; i < 4; ++i)
-			{
-				for(int j = 0; j < 4; ++j)
-				{
-					log4cpp::Category::getInstance(prm->locat).notice("%s: P1^C1[%d:%d] = %016lX", __FUNCTION__, i, j, RC2I(P1,i,j) ^ RC2I(C1,i,j));
-					log4cpp::Category::getInstance(prm->locat).notice("%s: P2^C2[%d:%d] = %016lX", __FUNCTION__, i, j, RC2I(P2,i,j) ^ RC2I(C2,i,j));
-					log4cpp::Category::getInstance(prm->locat).notice("%s: initb[%d:%d] = %016lX", __FUNCTION__, i, j, prm->init_block[i][j]);
-				}
-			}
-		}*/
+		if(log4cpp::Category::getInstance(prm->locat).isDebugEnabled())
+			validate_init_block(P1, C1, prm->init_block, prm->locat.c_str());
 
 		size_t n = lookup_counter_bits(C1, prm->id);
 
@@ -933,6 +925,21 @@ void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * i
 			is[i][j] = 0;
 
 	crypto_aead_encrypt_i((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key, ib);
+}
+
+void validate_init_block(const u_int64_t * P, const u_int64_t * C, u_int64_t init_block[4][5], const char * logcat)
+{
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 4; ++j)
+		{
+			if( ( RC2I(P,i,j) ^ RC2I(C,i,j) ) != init_block[i][j])
+			{
+				log4cpp::Category::getInstance(logcat).fatal("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
+				exit(-1);
+			}
+		}
+	}
 }
 
 /*
