@@ -936,10 +936,9 @@ void validate_init_block(const u_int64_t * P, const u_int64_t * C, u_int64_t ini
 	{
 		for(int j = 0; j < 4; ++j)
 		{
-			log4cpp::Category::getInstance(logcat).debug("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
 			if( ( RC2I(P,i,j) ^ RC2I(C,i,j) ) != init_block[i][j])
 			{
-				log4cpp::Category::getInstance(logcat).fatal("%s: mismatch @%d:%d!", __FUNCTION__, i, j);
+				log4cpp::Category::getInstance(logcat).debug("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX; mismatch.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
 				exit(-1);
 			}
 		}
