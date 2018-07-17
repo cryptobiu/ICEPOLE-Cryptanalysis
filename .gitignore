@@ -16,4 +16,6 @@ icepole/icepole128av2/ref/libicepole_128AV2.a
 icepole/icepole128av2/ref/.cproject
 icepole/icepole128av2/ref/.project
 
+test_site/.cproject
+test_site/.project
 
