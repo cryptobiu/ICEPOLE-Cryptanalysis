@@ -7,6 +7,8 @@
 #include <math.h>
 
 #include <string>
+#include <sstream>
+#include <iomanip>
 
 #include <openssl/evp.h>
 #include <event2/event.h>
@@ -35,7 +37,6 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 u_int64_t left_rotate(u_int64_t v, size_t r);
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
-u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
@@ -43,8 +44,9 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 std::string block2text(const u_int64_t * B);
 void * u03_attacker_hack(void * arg);
 u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id);
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t id);
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
-void validate_init_block(const u_int64_t * P, const u_int64_t * C, u_int64_t init_block[4][5], const char * logcat);
+void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64_t init_block[4][5], const char * logcat);
 
 #define KEY_SIZE			16
 #define BLOCK_SIZE			128
@@ -732,10 +734,19 @@ size_t lookup_counter_bits(const u_int64_t * C, const size_t id)
 	u_int64_t LC[BLONG_SIZE];
 	pi_rho_mu((const unsigned char *)C, (unsigned char *)LC);
 
-	u_int64_t x = 3, y_hi = 1, y_lo = 3, z = 41;
+	u_int8_t bit_3_1_41 = 0;
+	if(RC2I(C,3,1) & left_rotate(1, 41 + id))
+	{
+		bit_3_1_41 = 1;
+	}
 
-	return (get_bit(LC, x, y_hi, left_rotate(z, id)) << 1) | (get_bit(LC, x, y_lo, left_rotate(z, id)));
+	u_int8_t bit_3_3_41 = 0;
+	if(RC2I(C,3,3) & left_rotate(1, 41 + id))
+	{
+		bit_3_3_41 = 1;
+	}
 
+	return (bit_3_1_41 << 1) | bit_3_3_41;
 }
 
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
@@ -845,8 +856,7 @@ void * u03_attacker_hack(void * arg)
 	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
 
-	u_int64_t x_state_1[4*5];
-	u_int64_t x_state_2[4*5];
+	u_int64_t x_state[4][5];
 	u_int8_t F1 = 0, F2 = 0;
 
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
@@ -858,17 +868,17 @@ void * u03_attacker_hack(void * arg)
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
-		crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, (u_int64_t (*)[5])x_state_1);
-		F1 = xor_state_bits(x_state_1, prm->id);
+		crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state);
+		F1 = xor_state_bits(x_state, prm->id);
 
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
-		crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, (u_int64_t (*)[5])x_state_2);
-		F2 = xor_state_bits(x_state_2, prm->id);
+		crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state);
+		F2 = xor_state_bits(x_state, prm->id);
 
 		if(log4cpp::Category::getInstance(prm->locat).isDebugEnabled())
 		{
-			validate_init_block(P1, C1, prm->init_block, prm->locat.c_str());
-			validate_init_block(P2, C2, prm->init_block, prm->locat.c_str());
+			validate_init_state(P1, C1, prm->init_block, prm->locat.c_str());
+			validate_init_state(P2, C2, prm->init_block, prm->locat.c_str());
 		}
 
 		size_t n = lookup_counter_bits(C1, prm->id);
@@ -930,7 +940,7 @@ void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * i
 	crypto_aead_encrypt_i((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key, ib);
 }
 
-void validate_init_block(const u_int64_t * P, const u_int64_t * C, u_int64_t init_block[4][5], const char * logcat)
+void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64_t init_block[4][5], const char * logcat)
 {
 	for(int i = 0; i < 4; ++i)
 	{
@@ -938,7 +948,7 @@ void validate_init_block(const u_int64_t * P, const u_int64_t * C, u_int64_t ini
 		{
 			if( ( RC2I(P,i,j) ^ RC2I(C,i,j) ) != init_block[i][j])
 			{
-				log4cpp::Category::getInstance(logcat).debug("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX; mismatch.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
+				log4cpp::Category::getInstance(logcat).fatal("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX; mismatch.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
 				exit(-1);
 			}
 		}
@@ -986,3 +996,198 @@ is[2][4]=0xEA834B763DF9FBED
 is[3][4]=0x59DE9D0C1196F242
 
  */
+
+#define KEYSIZE		16
+
+void notice_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat)
+{
+	std::stringstream srs;
+	srs << std::hex << std::setfill('0');
+	for(size_t i = 0; i < size; ++i)
+		srs << std::setw(2) << static_cast<unsigned>(buffer[i]);
+	log4cpp::Category::getInstance(logcat).notice("%s: [%s]", label, srs.str().c_str());
+}
+
+void notice_block(const char * label, const u_int64_t * block, const char * logcat)
+{
+	std::string str;
+	char buffer[64];
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 4; ++j)
+		{
+			snprintf(buffer, 64, "%016lX ", RC2I(block, i, j));
+			str += buffer;
+		}
+		str += '\n';
+	}
+	log4cpp::Category::getInstance(logcat).notice("%s:\n%s", label, str.c_str());
+}
+
+void notice_state(const char * label, const u_int64_t state[4][5], const char * logcat)
+{
+	std::string str;
+	char buffer[64];
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 5; ++j)
+		{
+			snprintf(buffer, 64, "%016lX ", state[i][j]);
+			str += buffer;
+		}
+		str += '\n';
+	}
+	log4cpp::Category::getInstance(logcat).notice("%s:\n%s", label, str.c_str());
+}
+
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t id)
+{
+	static const struct __bit_t { size_t x; size_t y; size_t z; } bits[8] = { {0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
+																			  {2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
+	u_int8_t result = 0;
+	for(size_t i = 0; i < 8; ++i)
+	{
+		u_int64_t integer = state[bits[i].x][bits[i].y];
+		u_int64_t mask = left_rotate(0x1, bits[i].z + id);
+		result ^= ((integer & mask)? 1: 0);
+	}
+	return result;
+}
+
+void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t iv[KEYSIZE], const u_int64_t init_state[4][5], aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
+	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+
+	u_int64_t x_state[4][5];
+	u_int8_t F1 = 0, F2 = 0;
+
+	generate_inputs(P1, P2, prg, 0, init_state);
+	notice_block("P1-0", P1, logcat);
+	notice_block("P1-1", P1+BLONG_SIZE, logcat);
+	notice_block("P2-0", P2, logcat);
+	notice_block("P2-1", P2+BLONG_SIZE, logcat);
+
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+	notice_state("x-state-1", x_state, logcat);
+
+	validate_init_state(P1, C1, init_state, logcat);
+
+	F1 = xor_state_bits(x_state, 0);
+	log4cpp::Category::getInstance(logcat).notice("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, F1);
+
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+	notice_state("x-state-2", x_state, logcat);
+
+	validate_init_state(P2, C2, init_state, logcat);
+
+	F2 = xor_state_bits(x_state, 0);
+	log4cpp::Category::getInstance(logcat).notice("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
+
+	notice_block("C1-0", C1, logcat);
+
+	size_t n = lookup_counter_bits(C1, 0);
+
+	log4cpp::Category::getInstance(logcat).notice("%s: counter bit [3][1][41] = %hhu.", __FUNCTION__, ((n & 0x2)? 1: 0));
+	log4cpp::Category::getInstance(logcat).notice("%s: counter bit [3][3][41] = %hhu.", __FUNCTION__, ((n & 0x1)? 1: 0));
+
+
+	/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
+	 */
+	ctr_1[n]++;
+
+	/*
+	 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
+	 */
+	if(F1 == F2)
+		ctr_2[n]++;
+}
+
+void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], const u_int64_t U0, const u_int64_t U3)
+{
+	u_int64_t v[2];
+
+	size_t max_dev_counter_index = 4;
+	double max_dev = 0.0, dev;
+	for(size_t i = 0; i < 4; ++i)
+	{
+		dev = (0 != ctr_1[i])? fabs( ( double(ctr_2[i]) / double(ctr_1[i]) ) - 0.5 ): 0.0;
+
+		log4cpp::Category::getInstance(logcat).notice("%s: ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.08f;",
+				__FUNCTION__, i, ctr_1[i], i, ctr_2[i], dev);
+
+		if(max_dev < dev)
+		{
+			max_dev = dev;
+			max_dev_counter_index = i;
+		}
+	}
+	log4cpp::Category::getInstance(logcat).debug("%s: selected ctr = %lu.",
+			__FUNCTION__, max_dev_counter_index);
+
+	v[0] = (max_dev_counter_index & 0x2)? 1: 0;
+	v[1] = (max_dev_counter_index & 0x1)? 1: 0;
+
+	log4cpp::Category::getInstance(logcat).notice("%s: selected ctr-idx = %lu; v0 = %lu; v1 = %lu.",
+			__FUNCTION__, max_dev_counter_index, v[0], v[1]);
+
+	log4cpp::Category::getInstance(logcat).notice("%s: guessued U3 bit 31 = %lu; actual U3 bit 31 = %lu; U3 %s.",
+			__FUNCTION__, v[0]^1, (U3 >> 31) & 0x1, (((v[0]^1) == ((U3 >> 31) & 0x1))? "success": "failure"));
+	log4cpp::Category::getInstance(logcat).notice("%s: ", __FUNCTION__);
+
+	u_int64_t U0_b49 = (U0 >> 49) & 0x1;
+	u_int64_t U3_b49 = (U3 >> 49) & 0x1;
+
+	log4cpp::Category::getInstance(logcat).notice("%s: U0_b49 = %lu; U3_b49 = %lu; v[1] = %lu.", __FUNCTION__, U0_b49, U3_b49, v[1]);
+	if((U0_b49 ^ U3_b49) == v[1])
+		log4cpp::Category::getInstance(logcat).notice("%s: (U0_b49 ^ U3_b49) == v[1]; U0 success.", __FUNCTION__);
+	else
+		log4cpp::Category::getInstance(logcat).notice("%s: (U0_b49 ^ U3_b49) != v[1]; U0 failure.", __FUNCTION__);
+}
+
+static const size_t keys = 10, attacks = 10;
+
+int attack_u03_bit0_test(const char * logcat)
+{
+	aes_prg prg;
+	if(0 != prg.init(BLOCK_SIZE))
+	{
+		log4cpp::Category::getInstance(logcat).error("%s: prg.init() failure", __FUNCTION__);
+		return -1;
+	}
+
+	u_int8_t key[KEYSIZE], iv[KEYSIZE];
+
+	for(int i = 0; i < keys; ++i)
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: checking key %d.\n=============================================================\n", __FUNCTION__, i);
+		prg.gen_rand_bytes(key, KEYSIZE);
+		notice_buffer("key", key, KEYSIZE, logcat);
+		prg.gen_rand_bytes(iv, KEYSIZE);
+		notice_buffer("iv", iv, KEYSIZE, logcat);
+
+		u_int64_t init_state[4][5];
+		get_init_block(init_state, key, iv);
+		notice_state("init_state", init_state, logcat);
+
+		size_t ctr_1[4], ctr_2[4];
+		memset(ctr_1, 0, 4 * sizeof(size_t));
+		memset(ctr_2, 0, 4 * sizeof(size_t));
+
+		for(size_t j = 0; j < attacks; ++j)
+		{
+			log4cpp::Category::getInstance(logcat).notice("%s: running attack %lu.\n--------------------------------------------------------------\n", __FUNCTION__, j);
+			attack_key(logcat, key, iv, init_state, prg, ctr_1, ctr_2);
+		}
+
+		for(size_t j = 0; j < 4; ++j)
+			log4cpp::Category::getInstance(logcat).notice("%s: ctr_1[%lu] = %lu; ctr_2[%lu] = %lu.", __FUNCTION__, j, ctr_1[j], j, ctr_2[j]);
+
+		guess(logcat, ctr_1, ctr_2, init_state[0][4], init_state[3][4]);
+
+	}
+
+}

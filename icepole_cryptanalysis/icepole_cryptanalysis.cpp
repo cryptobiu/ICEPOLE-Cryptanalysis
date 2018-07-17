@@ -35,6 +35,8 @@ u_int64_t left_rotate(u_int64_t v, size_t r);
 void cryptanalysis();
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3);
 
+int attack_u03_bit0_test(const char * logcat);
+
 static const char * logcat = "ca4ip.log";
 
 int main(int argc, char *argv[])
@@ -121,11 +123,18 @@ void cryptanalysis()
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
 
+	if(0 != attack_u03_bit0_test(logcat))
+	{
+		log4cpp::Category::getInstance(logcat).error("%s: attack_u03_bit0_test() failure.", __FUNCTION__);
+		return;
+	}
+
+	/*
 	if(0 != attack_u03(logcat, key, iv, U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
 		return;
-	}
+	}*/
 
 	/*
 	if(0 != attack_u2(key, iv, U[2]))
