@@ -132,7 +132,7 @@ void oneround(ICESTATE SS, ICESTATE S, int roundNo)
     Kappa(SS, E, roundNo);
 }
 
-void oneround_hack2(ICESTATE SS, ICESTATE S, int roundNo, ICESTATE xS, int * xflag)
+void oneround_hack(ICESTATE SS, ICESTATE S, int roundNo, uint64_t XS[4][5], int * xflag)
 {
     ICESTATE B;
     ICESTATE C;
@@ -147,7 +147,7 @@ void oneround_hack2(ICESTATE SS, ICESTATE S, int roundNo, ICESTATE xS, int * xfl
         unsigned int x,y;
         for(x = 0; x < 4; ++x) {
             for(y = 0; y < 5; ++y) {
-                xS[x][y] = D[x][y];
+                XS[x][y] = D[x][y];
             }
         }
     }
@@ -169,7 +169,7 @@ void P6(ICESTATE SS, ICESTATE S)
     oneround(SS,A,5);
 }
 
-void P6_hack2(ICESTATE SS, ICESTATE S, ICESTATE xS, int * xflag)
+void P6_hack(ICESTATE SS, ICESTATE S, uint64_t XS[4][5], int * xflag)
 {
     ICESTATE A;
     ICESTATE B;
@@ -179,7 +179,7 @@ void P6_hack2(ICESTATE SS, ICESTATE S, ICESTATE xS, int * xflag)
     oneround(A,B,2);
     oneround(B,A,3);
     oneround(A,B,4);
-    oneround_hack2(SS,A,5, xS, xflag);
+    oneround_hack(SS,A,5, XS, xflag);
 }
 
 void P12(ICESTATE SS, ICESTATE S)

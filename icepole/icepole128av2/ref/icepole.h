@@ -22,7 +22,7 @@ void Psi(ICESTATE SS, ICESTATE S);
 void Kappa(ICESTATE SS, ICESTATE S, int roundNo);
 void oneround(ICESTATE SS, ICESTATE S, int roundNo);
 void P6(ICESTATE SS, ICESTATE S);
-void P6_hack2(ICESTATE SS, ICESTATE S, ICESTATE xS, int * xflag);
+void P6_hack(ICESTATE SS, ICESTATE S, uint64_t XS[4][5], int * xflag);
 void P12(ICESTATE SS, ICESTATE S);
 
 void initState128a(

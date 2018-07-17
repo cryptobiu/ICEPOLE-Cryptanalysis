@@ -229,11 +229,11 @@ int crypto_aead_encrypt_hack(
 	const unsigned char *nsec,
 	const unsigned char *npub,
 	const unsigned char *k,
-	u_int64_t x_state[4][5])
+	u_int64_t XS[4][5])
 {
 	int xted = 0;
 
-    ICESTATE S, xS;
+    ICESTATE S;
     unsigned int frameBit;
 
     /* initialize the state with secret key and nonce */
@@ -268,7 +268,7 @@ int crypto_aead_encrypt_hack(
             blocklen = mlen;
         }
         /* apply the permutation to the state */
-        P6_hack2(S, S, xS, &xted);		//the hack extracts the state at exactly the 2nd call.
+        P6_hack(S, S, XS, &xted);		//the hack extracts the state at exactly the 2nd call.
         /* absorb a data block and produce a ciphertext block */
         processDataBlock(S, m, &c, blocklen, frameBit);
         m += blocklen;
@@ -277,8 +277,5 @@ int crypto_aead_encrypt_hack(
 
     /* store authentication tag at the end of the ciphertext */
     generateTag(S, c);
-	for(int i = 0; i < 4; ++i)
-		for(int j = 0; j < 5; ++j)
-			x_state[i][j] = xS[i][j];
     return 0;
 }

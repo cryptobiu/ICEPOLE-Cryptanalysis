@@ -43,5 +43,5 @@ extern "C"
 		const unsigned char *nsec,
 		const unsigned char *npub,
 		const unsigned char *k,
-		u_int64_t is[4][5]);
+		u_int64_t XS[4][5]);
 };
