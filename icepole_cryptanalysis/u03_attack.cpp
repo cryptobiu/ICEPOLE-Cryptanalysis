@@ -250,7 +250,6 @@ void timer_cb(evutil_socket_t, short, void * arg)
 	{
 		u_int64_t samples_done = __sync_add_and_fetch(eprm->samples_done + i, 0);
 		log4cpp::Category::getInstance(eprm->locat).notice("%s: thread %lu smaples done = %lu.", __FUNCTION__, i, samples_done);
-
 		all_samples_done = all_samples_done && (samples_done >= u03_ceiling_pow_2_33p9);
 	}
 
@@ -1150,6 +1149,7 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 
 static const size_t keys = 10, attacks = 10;
 
+/*
 int attack_u03_bit0_test(const char * logcat)
 {
 	aes_prg prg;
@@ -1190,4 +1190,217 @@ int attack_u03_bit0_test(const char * logcat)
 
 	}
 
+}
+*/
+
+typedef struct
+{
+	size_t id;
+	std::string locat;
+	sem_t * run_flag;
+	u_int64_t * samples_done;
+}u03_bit0_attacker_t;
+
+void * attack_u03_bit0_test_proc(void * arg)
+{
+	u03_bit0_attacker_t * prm = (u03_bit0_attacker_t *)arg;
+
+	{
+		char atckr_locat[32];
+		snprintf(atckr_locat, 32, "%s.%lu", prm->locat.c_str(), prm->id);
+		prm->locat = atckr_locat;
+	}
+
+	aes_prg prg;
+	if(0 != prg.init(BLOCK_SIZE))
+	{
+		log4cpp::Category::getInstance(prm->locat.c_str()).error("%s: prg.init() failure", __FUNCTION__);
+		return NULL;
+	}
+
+	u_int8_t key[KEYSIZE], iv[KEYSIZE];
+
+	prg.gen_rand_bytes(key, KEYSIZE);
+	notice_buffer("key", key, KEYSIZE, prm->locat.c_str());
+	prg.gen_rand_bytes(iv, KEYSIZE);
+	notice_buffer("iv", iv, KEYSIZE, prm->locat.c_str());
+
+	u_int64_t init_state[4][5];
+	get_init_block(init_state, key, iv);
+	notice_state("init_state", init_state, prm->locat.c_str());
+
+	size_t ctr_1[4], ctr_2[4];
+	memset(ctr_1, 0, 4 * sizeof(size_t));
+	memset(ctr_2, 0, 4 * sizeof(size_t));
+
+	int run_flag_value;
+	if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
+	{
+		int errcode = errno;
+		char errmsg[256];
+		log4cpp::Category::getInstance(prm->locat).error("%s: sem_getvalue() failed with error %d : [%s]",
+				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+		exit(__LINE__);
+	}
+
+	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
+	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
+	{
+		attack_key(prm->locat.c_str(), key, iv, init_state, prg, ctr_1, ctr_2);
+
+		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
+		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
+		{
+			int errcode = errno;
+			char errmsg[256];
+			log4cpp::Category::getInstance(prm->locat).error("%s: sem_getvalue() failed with error %d : [%s]",
+					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+			exit(__LINE__);
+		}
+	}
+
+	for(size_t j = 0; j < 4; ++j)
+		log4cpp::Category::getInstance(prm->locat.c_str()).notice("%s: ctr_1[%lu] = %lu; ctr_2[%lu] = %lu.", __FUNCTION__, j, ctr_1[j], j, ctr_2[j]);
+
+	guess(prm->locat.c_str(), ctr_1, ctr_2, init_state[0][4], init_state[3][4]);
+	return NULL;
+}
+
+int attack_u03_bit0_test(const char * logcat)
+{
+	int result = -1;
+
+	char locat[32];
+	snprintf(locat, 32, "%s.u03", logcat);
+
+	u_int64_t * samples_done = new u_int64_t[u03_thread_count];
+	memset(samples_done, 0, u03_thread_count * sizeof(u_int64_t));
+
+	sem_t run_flag;
+	if(0 == sem_init(&run_flag, 0, 1))
+	{
+		struct event_base * the_base = event_base_new();
+		if(NULL != the_base)
+		{
+			log4cpp::Category::getInstance(locat).debug("%s: the event base was created.", __FUNCTION__);
+
+			event_param_t eprm;
+			eprm.the_base = the_base;
+			eprm.locat = locat;
+			eprm.samples_done = samples_done;
+
+			struct event * sigint_evt = evsignal_new(the_base, 2/*=SIGINT*/, sigint_cb, &eprm);
+			if(NULL != sigint_evt)
+			{
+				log4cpp::Category::getInstance(locat).debug("%s: the SIGINT event was created.", __FUNCTION__);
+
+				if(0 == event_add(sigint_evt, NULL))
+				{
+					log4cpp::Category::getInstance(locat).debug("%s: the SIGINT event was added.", __FUNCTION__);
+
+					struct event * timer_evt = event_new(the_base, -1, EV_TIMEOUT|EV_PERSIST, timer_cb, &eprm);
+					if(NULL != timer_evt)
+					{
+						log4cpp::Category::getInstance(locat).debug("%s: the timer event was created.", __FUNCTION__);
+
+						struct timeval twosec = {2,0};
+						if(0 == event_add(timer_evt, &twosec))
+						{
+							log4cpp::Category::getInstance(locat).debug("%s: the timer event was added.", __FUNCTION__);
+
+							int errcode;
+							std::vector<pthread_t> atckr_thds(u03_thread_count);
+							std::vector<u03_bit0_attacker_t> atckr_prms(u03_thread_count);
+							for(size_t i = 0; i < u03_thread_count; ++i)
+							{
+								atckr_prms[i].id = i;
+								atckr_prms[i].locat = locat;
+								atckr_prms[i].run_flag = &run_flag;
+								atckr_prms[i].samples_done = samples_done + i;
+								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attack_u03_bit0_test_proc, (void *)(atckr_prms.data() + i))))
+								{
+									char errmsg[256];
+									log4cpp::Category::getInstance(locat).error("%s: pthread_create() failed with error %d : [%s]",
+											__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+									exit(__LINE__);
+								}
+								log4cpp::Category::getInstance(locat).debug("%s: u03 attacker thread %lu started.", __FUNCTION__, i);
+							}
+							log4cpp::Category::getInstance(locat).notice("%s: all u03 attacker threads are run.", __FUNCTION__);
+
+							log4cpp::Category::getInstance(locat).notice("%s: event loop started.", __FUNCTION__);
+							event_base_dispatch(the_base);
+							log4cpp::Category::getInstance(locat).notice("%s: event loop stopped.", __FUNCTION__);
+
+							if(0 != sem_wait(&run_flag))
+							{
+								int errcode = errno;
+								char errmsg[256];
+								log4cpp::Category::getInstance(locat).error("%s: sem_wait() failed with error %d : [%s]",
+										__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+								exit(__LINE__);
+							}
+							log4cpp::Category::getInstance(locat).notice("%s: u03 attacker thread run signal is down.", __FUNCTION__);
+
+							for(size_t i = 0; i < u03_thread_count; ++i)
+							{
+								void * retval = NULL;
+								if(0 != (errcode = pthread_join(atckr_thds[i], &retval)))
+								{
+									char errmsg[256];
+									log4cpp::Category::getInstance(locat).error("%s: pthread_join() failed with error %d : [%s]",
+											__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+									exit(__LINE__);
+								}
+								log4cpp::Category::getInstance(locat).debug("%s: u03 attacker thread %lu joined.", __FUNCTION__, i);
+							}
+							log4cpp::Category::getInstance(locat).notice("%s: all u03 attacker threads are joined.", __FUNCTION__);
+
+							event_del(timer_evt);
+							log4cpp::Category::getInstance(locat).debug("%s: the timer event was removed.", __FUNCTION__);
+						}
+						else
+							log4cpp::Category::getInstance(locat).error("%s: event_add(timer) failed.", __FUNCTION__);
+
+						event_free(timer_evt);
+						log4cpp::Category::getInstance(locat).debug("%s: the timer event was freed.", __FUNCTION__);
+					}
+					else
+						log4cpp::Category::getInstance(locat).error("%s: event_new() failed.", __FUNCTION__);
+
+					event_del(sigint_evt);
+					log4cpp::Category::getInstance(locat).debug("%s: the SIGINT event was removed.", __FUNCTION__);
+				}
+				else
+					log4cpp::Category::getInstance(locat).error("%s: event_add(sigint) failed.", __FUNCTION__);
+
+				event_free(sigint_evt);
+				log4cpp::Category::getInstance(locat).debug("%s: the SIGINT event was freed.", __FUNCTION__);
+			}
+			else
+				log4cpp::Category::getInstance(locat).error("%s: evsignal_new() failed.", __FUNCTION__);
+
+			event_base_free(the_base);
+			log4cpp::Category::getInstance(locat).debug("%s: the event base was destroyed.", __FUNCTION__);
+		}
+		else
+			log4cpp::Category::getInstance(locat).error("%s: event_base_new() failed.", __FUNCTION__);
+
+		if(0 != sem_destroy(&run_flag))
+		{
+			int errcode = errno;
+			char errmsg[256];
+			log4cpp::Category::getInstance(locat).error("%s: sem_destroy() failed with error %d : [%s]",
+					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+		}
+	}
+	else
+	{
+		int errcode = errno;
+		char errmsg[256];
+		log4cpp::Category::getInstance(locat).error("%s: sem_init() failed with error %d : [%s]",
+				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+	}
+	delete []samples_done;
+	return result;
 }
