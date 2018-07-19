@@ -1063,14 +1063,14 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	u_int8_t F1 = 0, F2 = 0;
 
 	generate_inputs(P1, P2, prg, 0, init_state);
-	notice_block("P1-0", P1, logcat);
-	notice_block("P1-1", P1+BLONG_SIZE, logcat);
-	notice_block("P2-0", P2, logcat);
-	notice_block("P2-1", P2+BLONG_SIZE, logcat);
+	//notice_block("P1-0", P1, logcat);
+	//notice_block("P1-1", P1+BLONG_SIZE, logcat);
+	//notice_block("P2-0", P2, logcat);
+	//notice_block("P2-1", P2+BLONG_SIZE, logcat);
 
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-	notice_state("x-state-1", x_state, logcat);
+	//notice_state("x-state-1", x_state, logcat);
 
 	validate_init_state(P1, C1, init_state, logcat);
 
@@ -1079,14 +1079,14 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-	notice_state("x-state-2", x_state, logcat);
+	//notice_state("x-state-2", x_state, logcat);
 
 	validate_init_state(P2, C2, init_state, logcat);
 
 	F2 = xor_state_bits(x_state, 0);
 	log4cpp::Category::getInstance(logcat).notice("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
 
-	notice_block("C1-0", C1, logcat);
+	//notice_block("C1-0", C1, logcat);
 
 	size_t n = lookup_counter_bits(C1, 0);
 
@@ -1221,13 +1221,13 @@ void * attack_u03_bit0_test_proc(void * arg)
 	u_int8_t key[KEYSIZE], iv[KEYSIZE];
 
 	prg.gen_rand_bytes(key, KEYSIZE);
-	notice_buffer("key", key, KEYSIZE, prm->locat.c_str());
+	//notice_buffer("key", key, KEYSIZE, prm->locat.c_str());
 	prg.gen_rand_bytes(iv, KEYSIZE);
-	notice_buffer("iv", iv, KEYSIZE, prm->locat.c_str());
+	//notice_buffer("iv", iv, KEYSIZE, prm->locat.c_str());
 
 	u_int64_t init_state[4][5];
 	get_init_block(init_state, key, iv);
-	notice_state("init_state", init_state, prm->locat.c_str());
+	//notice_state("init_state", init_state, prm->locat.c_str());
 
 	size_t ctr_1[4], ctr_2[4];
 	memset(ctr_1, 0, 4 * sizeof(size_t));
