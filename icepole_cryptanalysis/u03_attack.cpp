@@ -440,7 +440,7 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		};
 		*/
 		u_int64_t mask = 0x0000000200000000;
-		if(1 == (
+		if(mask == (
 					(RC2I(P1_ib_xor,0,2) & mask) ^
 					(RC2I(P1_ib_xor,1,3) & mask) ^
 					(RC2I(P1_ib_xor,2,3) & mask) ^
@@ -459,7 +459,7 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		};
 		 */
 		u_int64_t mask = 0x0000000000000001;
-		if(1 == (
+		if(mask == (
 					(RC2I(P1_ib_xor,0,2) & mask) ^
 					(RC2I(P1_ib_xor,1,3) & mask) ^
 					(RC2I(P1_ib_xor,2,3) & mask) ^
