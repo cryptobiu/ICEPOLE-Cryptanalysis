@@ -1075,7 +1075,7 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	validate_init_state(P1, C1, init_state, logcat);
 
 	F1 = xor_state_bits(x_state, 0);
-	log4cpp::Category::getInstance(logcat).notice("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, F1);
+	//log4cpp::Category::getInstance(logcat).notice("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, F1);
 
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
@@ -1084,14 +1084,14 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	validate_init_state(P2, C2, init_state, logcat);
 
 	F2 = xor_state_bits(x_state, 0);
-	log4cpp::Category::getInstance(logcat).notice("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
+	//log4cpp::Category::getInstance(logcat).notice("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
 
 	//notice_block("C1-0", C1, logcat);
 
 	size_t n = lookup_counter_bits(C1, 0);
 
-	log4cpp::Category::getInstance(logcat).notice("%s: counter bit [3][1][41] = %hhu.", __FUNCTION__, ((n & 0x2)? 1: 0));
-	log4cpp::Category::getInstance(logcat).notice("%s: counter bit [3][3][41] = %hhu.", __FUNCTION__, ((n & 0x1)? 1: 0));
+	//log4cpp::Category::getInstance(logcat).notice("%s: counter bit [3][1][41] = %hhu.", __FUNCTION__, ((n & 0x2)? 1: 0));
+	//log4cpp::Category::getInstance(logcat).notice("%s: counter bit [3][3][41] = %hhu.", __FUNCTION__, ((n & 0x1)? 1: 0));
 
 
 	/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
