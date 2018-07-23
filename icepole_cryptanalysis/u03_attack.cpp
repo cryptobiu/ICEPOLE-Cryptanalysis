@@ -45,7 +45,6 @@ size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 std::string block2text(const u_int64_t * B);
 void * u03_attacker_hack(void * arg);
-u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t id);
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
 void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64_t init_block[4][5], const char * logcat);
@@ -909,22 +908,6 @@ void * u03_attacker_hack(void * arg)
 	return NULL;
 }
 
-u_int8_t xor_state_bits(const u_int64_t x_state[4*5], const size_t id)
-{
-	static const struct __bit_t { size_t x; size_t y; size_t z; } bits[8] = { {0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
-																			  {2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
-	u_int8_t result = 0;
-	for(size_t i = 0; i < 8; ++i)
-	{
-		struct __bit_t current_bit = bits[i];
-		current_bit.z = (current_bit.z + id)%64;
-
-		result ^= get_bit(x_state, current_bit.x, current_bit.y, current_bit.z);
-	}
-
-	return result;
-}
-
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv)
 {
 	u_int8_t C[128+16];
@@ -972,28 +955,26 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	validate_generated_input_1(P1, init_state, logcat);
 	validate_generated_input_2(P1, P2, logcat);
 
-
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-	log_state("x-state-1", x_state, logcat, 700);
 
 	validate_init_state(P1, C1, init_state, logcat);
 
 	F1 = xor_state_bits(x_state, 0);
 	log4cpp::Category::getInstance(logcat).debug("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, F1);
+	validate_state_bits(x_state, F1, logcat);
 
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-	log_state("x-state-2", x_state, logcat, 700);
 
 	validate_init_state(P2, C2, init_state, logcat);
 
 	F2 = xor_state_bits(x_state, 0);
 	log4cpp::Category::getInstance(logcat).debug("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
-
-	log_block("C1-0", C1, logcat, 700);
+	validate_state_bits(x_state, F2, logcat);
 
 	size_t n = lookup_counter_bits(C1, 0);
+	validate_counter_bits(C1, n, logcat);
 
 	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][1][41] = %hhu.", __FUNCTION__, ((n & 0x2)? 1: 0));
 	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][3][41] = %hhu.", __FUNCTION__, ((n & 0x1)? 1: 0));

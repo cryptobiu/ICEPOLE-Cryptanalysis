@@ -5,6 +5,8 @@
 
 #include <log4cpp/Category.hh>
 
+#include "icepole128av2/ref/encrypt.h"
+
 #define RC2I(arr,x,y) arr[x + 4*y]
 
 void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat, const int level)
@@ -56,7 +58,10 @@ void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64
 		{
 			if( ( RC2I(P,i,j) ^ RC2I(C,i,j) ) != init_block[i][j])
 			{
-				log4cpp::Category::getInstance(logcat).fatal("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX; mismatch.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
+				log4cpp::Category::getInstance(logcat).fatal("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX; mismatch.",
+						__FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
+				log_block("P", P, logcat, 0);
+				log_state("IS", init_block, logcat, 0);
 				exit(-1);
 			}
 		}
@@ -178,7 +183,7 @@ void validate_generated_input_1(const u_int64_t * P, const u_int64_t init_state[
 		log_state("IS", init_state, logcat, 0);
 		exit(-1);
 	}
-	log4cpp::Category::getInstance(logcat).info("%s: generated input 4 constraints check.", __FUNCTION__);
+	log4cpp::Category::getInstance(logcat).info("%s: generated input 4 constraints check out.", __FUNCTION__);
 }
 
 int validate_inputs_diff(int i, int j, const u_int64_t P1v, const u_int64_t P2v, const char * logcat)
@@ -240,4 +245,55 @@ void validate_generated_input_2(const u_int64_t * P1, const u_int64_t * P2, cons
 			}
 		}
 	}
+	log4cpp::Category::getInstance(logcat).info("%s: generated inputs XOR diff check out.", __FUNCTION__);
 }
+
+void validate_state_bits(const u_int64_t x_state[4][5], const u_int8_t F, const char * logcat)
+{
+	static const u_int64_t state_xor_bitmask[4][5] =
+	{
+		{ 0x0008000000000000, 0x0000000200000000, 0x0000000000000000, 0x0000000000001000, 0x0000000000000000 },
+		{ 0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000 },
+		{ 0x0000000000000000, 0x0040000000000000, 0x0000000040000000, 0x0000000000000000, 0x0000000000000000 },
+		{ 0x0000000000000000, 0x0000000000000000, 0x0000000000000400, 0x0000000002000000, 0x0000000000000000 }
+	};
+
+	u_int8_t control = 0;
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 5; ++j)
+		{
+			if(0 != (x_state[i][j] & state_xor_bitmask[i][j]))
+				control ^= 1;
+		}
+	}
+
+	if(F != control)
+	{
+		log4cpp::Category::getInstance(logcat).fatal("%s: state XOR bits mismatch; F=%hhu.", __FUNCTION__, F);
+		log_state("x_state", x_state, logcat, 0);
+		exit(-1);
+	}
+	log4cpp::Category::getInstance(logcat).info("%s: x-state XOR bits check out.", __FUNCTION__);
+}
+
+void validate_counter_bits(const u_int64_t * C, const size_t n, const char * logcat)
+{
+	u_int64_t LC[16];
+
+	pi_rho_mu((const unsigned char *)C, (unsigned char *)LC);
+
+	u_int64_t bit_3_1_41 = (0 == (RC2I(LC,3,1) & (0x1UL << 41)))? 0: 1;
+	u_int64_t bit_3_3_41 = (0 == (RC2I(LC,3,3) & (0x1UL << 41)))? 0: 1;
+
+	if(n != ((bit_3_1_41 << 1) | bit_3_3_41))
+	{
+		log4cpp::Category::getInstance(logcat).fatal("%s: counter bits mismatch; n = %lu; bit_3_1_41 = %lu; bit_3_3_41 = %lu;",
+				__FUNCTION__, n, bit_3_1_41, bit_3_3_41);
+		log_block("C", C, logcat, 0);
+		log_block("LC", LC, logcat, 0);
+		exit(-1);
+	}
+	log4cpp::Category::getInstance(logcat).info("%s: counter bits check out.", __FUNCTION__);
+}
+
