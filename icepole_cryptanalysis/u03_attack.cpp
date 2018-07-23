@@ -734,13 +734,13 @@ size_t lookup_counter_bits(const u_int64_t * C, const size_t id)
 	pi_rho_mu((const unsigned char *)C, (unsigned char *)LC);
 
 	u_int8_t bit_3_1_41 = 0;
-	if(RC2I(C,3,1) & left_rotate(1, 41 + id))
+	if(RC2I(LC,3,1) & left_rotate(1, 41 + id))
 	{
 		bit_3_1_41 = 1;
 	}
 
 	u_int8_t bit_3_3_41 = 0;
-	if(RC2I(C,3,3) & left_rotate(1, 41 + id))
+	if(RC2I(LC,3,3) & left_rotate(1, 41 + id))
 	{
 		bit_3_3_41 = 1;
 	}
@@ -1147,7 +1147,7 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 		log4cpp::Category::getInstance(logcat).notice("%s: (U0_b49 ^ U3_b49) != v[1]; U0 failure.", __FUNCTION__);
 }
 
-static const size_t keys = 2, attacks = 5;
+static const size_t keys = 1, attacks = 500;
 
 int attack_u03_bit0_test0(const char * logcat)
 {
