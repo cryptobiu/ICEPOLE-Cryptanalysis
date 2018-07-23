@@ -17,6 +17,8 @@
 #include "aes_prg.h"
 #include "icepole128av2/ref/encrypt.h"
 
+#include "u03_attack_validation.h"
+
 #define RC2I(arr,x,y) arr[x + 4*y]
 
 typedef struct
@@ -448,7 +450,7 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 			RC2I(P1,3,3) ^= mask;
 	}
 
-	{	//set 3rd constraint
+	{	//set 4th constraint
 		/*
 		const u_int64_t u03_P1_4th_constraint[16] =
 		{
@@ -939,105 +941,8 @@ void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * i
 	crypto_aead_encrypt_i((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key, ib);
 }
 
-void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64_t init_block[4][5], const char * logcat)
-{
-	for(int i = 0; i < 4; ++i)
-	{
-		for(int j = 0; j < 4; ++j)
-		{
-			if( ( RC2I(P,i,j) ^ RC2I(C,i,j) ) != init_block[i][j])
-			{
-				log4cpp::Category::getInstance(logcat).fatal("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX; mismatch.", __FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
-				exit(-1);
-			}
-		}
-	}
-}
-
-/*
-
-P^C[0][0]=0xD70D1D4E38595714
-P^C[0][1]=0xC9522A3FE713CD4B
-P^C[0][2]=0x202FF5705C142CF3
-P^C[0][3]=0x7C5430718EE8868B
-P^C[1][0]=0x5E5FDFBD725FB923
-P^C[1][1]=0xEA14E99D014CF99E
-P^C[1][2]=0xA15879EFF069B299
-P^C[1][3]=0xB36A4FFE824C398E
-P^C[2][0]=0x1E2DE62A326DF04B
-P^C[2][1]=0xC1EE321DDEDCD32B
-P^C[2][2]=0x4606FC818C329E6E
-P^C[2][3]=0xE4412ED389803DDE
-P^C[3][0]=0xACA8F5A68259FC88
-P^C[3][1]=0xB37E9F22C2E596BD
-P^C[3][2]=0x12FA2EF1B845C763
-P^C[3][3]=0x38A87A3813D3FC99
-
-is[0][0]=0xD70D1D4E38595714
-is[0][1]=0xC9522A3FE713CD4B
-is[0][2]=0x202FF5705C142CF3
-is[0][3]=0x7C5430718EE8868B
-is[1][0]=0x5E5FDFBD725FB923
-is[1][1]=0xEA14E99D014CF99E
-is[1][2]=0xA15879EFF069B299
-is[1][3]=0xB36A4FFE824C398E
-is[2][0]=0x1E2DE62A326DF04B
-is[2][1]=0xC1EE321DDEDCD32B
-is[2][2]=0x4606FC818C329E6E
-is[2][3]=0xE4412ED389803DDE
-is[3][0]=0xACA8F5A68259FC88
-is[3][1]=0xB37E9F22C2E596BD
-is[3][2]=0x12FA2EF1B845C763
-is[3][3]=0x38A87A3813D3FC99
-is[0][4]=0xFFEDFC54851730D5
-is[1][4]=0x9301658B3FBCC5C7
-is[2][4]=0xEA834B763DF9FBED
-is[3][4]=0x59DE9D0C1196F242
-
- */
-
 #define KEYSIZE		16
 
-void notice_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat)
-{
-	std::stringstream srs;
-	srs << std::hex << std::setfill('0');
-	for(size_t i = 0; i < size; ++i)
-		srs << std::setw(2) << static_cast<unsigned>(buffer[i]);
-	log4cpp::Category::getInstance(logcat).notice("%s: [%s]", label, srs.str().c_str());
-}
-
-void debug_block(const char * label, const u_int64_t * block, const char * logcat)
-{
-	std::string str;
-	char buffer[64];
-	for(int i = 0; i < 4; ++i)
-	{
-		for(int j = 0; j < 4; ++j)
-		{
-			snprintf(buffer, 64, "%016lX ", RC2I(block, i, j));
-			str += buffer;
-		}
-		str += '\n';
-	}
-	log4cpp::Category::getInstance(logcat).debug("%s:\n%s", label, str.c_str());
-}
-
-void debug_state(const char * label, const u_int64_t state[4][5], const char * logcat)
-{
-	std::string str;
-	char buffer[64];
-	for(int i = 0; i < 4; ++i)
-	{
-		for(int j = 0; j < 5; ++j)
-		{
-			snprintf(buffer, 64, "%016lX ", state[i][j]);
-			str += buffer;
-		}
-		str += '\n';
-	}
-	log4cpp::Category::getInstance(logcat).debug("%s:\n%s", label, str.c_str());
-}
 
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t id)
 {
@@ -1063,14 +968,14 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	u_int8_t F1 = 0, F2 = 0;
 
 	generate_inputs(P1, P2, prg, 0, init_state);
-	debug_block("P1-0", P1, logcat);
-	debug_block("P1-1", P1+BLONG_SIZE, logcat);
-	debug_block("P2-0", P2, logcat);
-	debug_block("P2-1", P2+BLONG_SIZE, logcat);
+
+	validate_generated_input_1(P1, init_state, logcat);
+	validate_generated_input_2(P1, P2, logcat);
+
 
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-	debug_state("x-state-1", x_state, logcat);
+	log_state("x-state-1", x_state, logcat, 700);
 
 	validate_init_state(P1, C1, init_state, logcat);
 
@@ -1079,14 +984,14 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-	debug_state("x-state-2", x_state, logcat);
+	log_state("x-state-2", x_state, logcat, 700);
 
 	validate_init_state(P2, C2, init_state, logcat);
 
 	F2 = xor_state_bits(x_state, 0);
 	log4cpp::Category::getInstance(logcat).debug("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
 
-	debug_block("C1-0", C1, logcat);
+	log_block("C1-0", C1, logcat, 700);
 
 	size_t n = lookup_counter_bits(C1, 0);
 
@@ -1164,13 +1069,13 @@ int attack_u03_bit0_test0(const char * logcat)
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: checking key %d.\n=============================================================\n", __FUNCTION__, i);
 		prg.gen_rand_bytes(key, KEYSIZE);
-		notice_buffer("key", key, KEYSIZE, logcat);
+		log_buffer("key", key, KEYSIZE, logcat, 700);
 		prg.gen_rand_bytes(iv, KEYSIZE);
-		notice_buffer("iv ", iv, KEYSIZE, logcat);
+		log_buffer("iv ", iv, KEYSIZE, logcat, 700);
 
 		u_int64_t init_state[4][5];
 		get_init_block(init_state, key, iv);
-		debug_state("init_state", init_state, logcat);
+		log_state("init_state", init_state, logcat, 700);
 
 		size_t ctr_1[4], ctr_2[4];
 		memset(ctr_1, 0, 4 * sizeof(size_t));
@@ -1402,3 +1307,4 @@ int attack_u03_bit0_test1(const char * logcat)
 	delete []samples_done;
 	return result;
 }
+

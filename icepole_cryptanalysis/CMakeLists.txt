@@ -18,6 +18,7 @@ set(SOURCE_FILES
 	aes_prg.cpp
 	icepole_cryptanalysis.cpp
 	u03_attack.cpp
+	u03_attack_validation.cpp
 )
 
 add_executable(icepole_cryptanalysis ${SOURCE_FILES})
