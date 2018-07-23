@@ -1033,7 +1033,7 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 		log4cpp::Category::getInstance(logcat).notice("%s: (U0_b49 ^ U3_b49) != v[1]; U0 failure.", __FUNCTION__);
 }
 
-static const size_t keys = 1, attacks = 500;
+static const size_t keys = 1, attacks = u03_ceiling_pow_2_33p9;
 
 int attack_u03_bit0_test0(const char * logcat)
 {
