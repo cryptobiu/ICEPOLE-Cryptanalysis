@@ -185,12 +185,12 @@ int test2()
 
 int test5()
 {
-	static const u_int64_t C[] =
+	static const u_int64_t C[4][5] =
 	{
-		0x0, 0x0, 0x1, 0x0,
-		0x1, 0x0, 0x1, 0x0,
-		0x1, 0x1, 0x1, 0x1,
-		0x0, 0x1, 0x0, 0x0,
+		{ 0x0, 0x0, 0x1, 0x0, 0x0 },
+		{ 0x1, 0x0, 0x1, 0x0, 0x0 },
+		{ 0x1, 0x1, 0x1, 0x1, 0x0 },
+		{ 0x0, 0x1, 0x0, 0x0, 0x0 }
 	};
 
 	char buffer[32];
@@ -200,13 +200,15 @@ int test5()
 	{
 		for(int j = 0; j < 4; j++)
 		{
-			snprintf(buffer, 32, "%016lX ", C[i + 4 * j]);
+			snprintf(buffer, 32, "%016lX ", C[i][j]);
 			cout << buffer;
 		}
 		cout << endl;
 	}
 
-	u_int64_t C_[16];
+	u_int64_t C_[4][5];
+	memset(C_, 0, 20*sizeof(u_int64_t));
+
 	pi_rho_mu((const u_int8_t *)C, (u_int8_t *)C_);
 
 	cout << "C_:" << endl;
@@ -214,7 +216,7 @@ int test5()
 	{
 		for(int j = 0; j < 4; j++)
 		{
-			snprintf(buffer, 32, "%016lX ", C_[i + 4 * j]);
+			snprintf(buffer, 32, "%016lX ", C_[i][j]);
 			cout << buffer;
 		}
 		cout << endl;
