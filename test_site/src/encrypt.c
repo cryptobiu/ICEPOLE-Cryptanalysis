@@ -147,13 +147,25 @@ int pi_rho_mu(const unsigned char * c, unsigned char * c_)
 	ICESTATE Ss, Sp, Sr, Sm;
 
 	memset(Ss, 0, sizeof(ICESTATE));
-	memcpy(Ss, c, 16*sizeof(u_int64_t));
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 4; ++j)
+		{
+			Ss[i][j] = ((const u_int64_t *)c)[i+4*j];
+		}
+	}
 
 	Mu(Sm, Ss);
 	Rho(Sr, Sm);
 	Pi(Sp, Sr);
 
-	memcpy(c_, Sp, 16*sizeof(u_int64_t));
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 4; ++j)
+		{
+			((u_int64_t *)c_)[i+4*j] = Sp[i][j];
+		}
+	}
 	return 0;
 }
 

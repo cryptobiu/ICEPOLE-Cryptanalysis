@@ -185,41 +185,44 @@ int test2()
 
 int test5()
 {
-	static const u_int64_t C[4][5] =
-	{
-		{ 0x0, 0x0, 0x1, 0x0, 0x0 },
-		{ 0x1, 0x0, 0x1, 0x0, 0x0 },
-		{ 0x1, 0x1, 0x1, 0x1, 0x0 },
-		{ 0x0, 0x1, 0x0, 0x0, 0x0 }
-	};
+	/*
+	static const char label[] = "column-order";
+	static const u_int64_t C[20] = { 0x0, 0x1, 0x1, 0x0, 0x0, 0x0, 0x1, 0x1, 0x1, 0x1, 0x1, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0,0x0, 0x0 };
+	/**/
+	static const char label[] = "row-order";
+	static const u_int64_t C[20] = { 0x0, 0x0, 0x1, 0x0, 0x0, 0x1, 0x0, 0x1, 0x0, 0x0, 0x1, 0x1, 0x1, 0x1, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0 };
+	/**/
+
+	cout << label << endl;
+
+	u_int64_t C_[20];
+	memset(C_, 0, 20*sizeof(u_int64_t));
 
 	char buffer[32];
 
 	cout << "C:" << endl;
 	for(int i = 0; i < 4; i++)
 	{
-		for(int j = 0; j < 4; j++)
+		for(int j = 0; j < 5; j++)
 		{
-			snprintf(buffer, 32, "%016lX ", C[i][j]);
+			snprintf(buffer, 32, "[%02d]%016lX ", i+4*j, RC2I(C,i,j));
 			cout << buffer;
 		}
 		cout << endl;
 	}
-
-	u_int64_t C_[4][5];
-	memset(C_, 0, 20*sizeof(u_int64_t));
 
 	pi_rho_mu((const u_int8_t *)C, (u_int8_t *)C_);
 
 	cout << "C_:" << endl;
 	for(int i = 0; i < 4; i++)
 	{
-		for(int j = 0; j < 4; j++)
+		for(int j = 0; j < 5; j++)
 		{
-			snprintf(buffer, 32, "%016lX ", C_[i][j]);
+			snprintf(buffer, 32, "[%02d]%016lX ", i+4*j, RC2I(C_,i,j));
 			cout << buffer;
 		}
 		cout << endl;
 	}
 	return 0;
 }
+
