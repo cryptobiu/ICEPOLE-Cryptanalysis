@@ -1054,7 +1054,7 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 		log4cpp::Category::getInstance(logcat).notice("%s: (U0_b49 ^ U3_b49) != v[1]; U0 failure.", __FUNCTION__);
 }
 
-static const size_t keys = 1, attacks = 50;//pow(2,22);
+static const size_t keys = 10, attacks = pow(2,22);
 
 int attack_u03_bit0_test0(const char * logcat)
 {
@@ -1067,9 +1067,11 @@ int attack_u03_bit0_test0(const char * logcat)
 
 	u_int8_t key[KEYSIZE], iv[KEYSIZE];
 
+	log4cpp::Category::getInstance(logcat).notice("%s: testing %lu keys against %lu attacks:", __FUNCTION__, keys, attacks);
+
 	for(int i = 0; i < keys; ++i)
 	{
-		log4cpp::Category::getInstance(logcat).notice("%s: checking key %d.\n=============================================================\n", __FUNCTION__, i);
+		log4cpp::Category::getInstance(logcat).notice("%s: checking key %d.\n=====================================================================================\n", __FUNCTION__, i);
 		prg.gen_rand_bytes(key, KEYSIZE);
 		log_buffer("key", key, KEYSIZE, logcat, 700);
 		prg.gen_rand_bytes(iv, KEYSIZE);
@@ -1085,8 +1087,9 @@ int attack_u03_bit0_test0(const char * logcat)
 
 		for(size_t j = 0; j < attacks; ++j)
 		{
-			log4cpp::Category::getInstance(logcat).notice("%s: running attack %lu.\n--------------------------------------------------------------\n", __FUNCTION__, j);
+			log4cpp::Category::getInstance(logcat).debug("%s: running attack %lu.\n------------------------------------------------------------------------------------\n", __FUNCTION__, j);
 			attack_key(logcat, key, iv, init_state, prg, ctr_1, ctr_2);
+			log4cpp::Category::getInstance(logcat).debug("\n------------------------------------------------------------------------------------\n", __FUNCTION__, j);
 		}
 
 		for(size_t j = 0; j < 4; ++j)
