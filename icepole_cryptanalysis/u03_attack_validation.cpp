@@ -294,6 +294,23 @@ void validate_counter_bits(const u_int64_t * C, const size_t n, const char * log
 		log_block("LC", LC, logcat, 0);
 		exit(-1);
 	}
+	/**/
+	else
+	{
+		//log_block("C", C, logcat, 700);
+		log_block("LC", LC, logcat, 700);
+
+		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][1] = 0x%016lX; LC[3][3] = 0x%016lX; ",
+				__FUNCTION__, RC2I(LC,3,1), RC2I(LC,3,3));
+		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][1][41] = 0x%016lX & 0x%016lX = 0x%016lX",
+				__FUNCTION__, RC2I(LC,3,1), (0x1UL << 41), (RC2I(LC,3,1) & (0x1UL << 41)));
+		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][3][41] = 0x%016lX & 0x%016lX = 0x%016lX",
+				__FUNCTION__, RC2I(LC,3,3), (0x1UL << 41), (RC2I(LC,3,3) & (0x1UL << 41)));
+
+		log4cpp::Category::getInstance(logcat).debug("%s: counter bits match; n = %lu; bit_3_1_41 = %lu; bit_3_3_41 = %lu;",
+				__FUNCTION__, n, bit_3_1_41, bit_3_3_41);
+	}
+
 	log4cpp::Category::getInstance(logcat).info("%s: counter bits check out.", __FUNCTION__);
 }
 

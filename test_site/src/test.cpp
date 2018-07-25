@@ -22,11 +22,12 @@ void trace_block(const char * label, const u_int64_t * block, const int extended
 int test1();
 int test2();
 int test4();
+int test5();
 
 int main() {
 	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
 
-	test2();
+	test5();
 
 	return 0;
 }
@@ -178,6 +179,45 @@ int test2()
 			snprintf(buffer, 64, "0x%016lX ", xs[i][j]);
 			cout << "xs[" << i << "][" << j << "]=" << buffer << endl;
 		}
+	}
+	return 0;
+}
+
+int test5()
+{
+	static const u_int64_t C[] =
+	{
+		0x0, 0x0, 0x1, 0x0,
+		0x1, 0x0, 0x1, 0x0,
+		0x1, 0x1, 0x1, 0x1,
+		0x0, 0x1, 0x0, 0x0,
+	};
+
+	char buffer[32];
+
+	cout << "C:" << endl;
+	for(int i = 0; i < 4; i++)
+	{
+		for(int j = 0; j < 4; j++)
+		{
+			snprintf(buffer, 32, "%016lX ", C[i + 4 * j]);
+			cout << buffer;
+		}
+		cout << endl;
+	}
+
+	u_int64_t C_[16];
+	pi_rho_mu((const u_int8_t *)C, (u_int8_t *)C_);
+
+	cout << "C_:" << endl;
+	for(int i = 0; i < 4; i++)
+	{
+		for(int j = 0; j < 4; j++)
+		{
+			snprintf(buffer, 32, "%016lX ", C_[i + 4 * j]);
+			cout << buffer;
+		}
+		cout << endl;
 	}
 	return 0;
 }

@@ -56,7 +56,7 @@ void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = 4194304;//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = 16029384739;
 
 typedef struct
 {
@@ -955,10 +955,23 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	validate_generated_input_1(P1, init_state, logcat);
 	validate_generated_input_2(P1, P2, logcat);
 
+	/**/
+	log_block("P1-0", P1, logcat, 700);
+	log_block("P1-1", P1+BLONG_SIZE, logcat, 700);
+	log_block("P2-0", P2, logcat, 700);
+	log_block("P2-1", P2+BLONG_SIZE, logcat, 700);
+
+
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
 
 	validate_init_state(P1, C1, init_state, logcat);
+
+	/**/
+	log_block("C1-0", C1, logcat, 700);
+	log_block("C1-1", C1+BLONG_SIZE, logcat, 700);
+	log_state("x-state-1", x_state, logcat, 700);
+
 
 	F1 = xor_state_bits(x_state, 0);
 	log4cpp::Category::getInstance(logcat).debug("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, F1);
@@ -969,6 +982,12 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 
 	validate_init_state(P2, C2, init_state, logcat);
 
+	/**/
+	log_block("C2-0", C2, logcat, 700);
+	log_block("C2-1", C2+BLONG_SIZE, logcat, 700);
+	log_state("x-state-2", x_state, logcat, 700);
+
+
 	F2 = xor_state_bits(x_state, 0);
 	log4cpp::Category::getInstance(logcat).debug("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
 	validate_state_bits(x_state, F2, logcat);
@@ -976,8 +995,10 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	size_t n = lookup_counter_bits(C1, 0);
 	validate_counter_bits(C1, n, logcat);
 
+	/**/
 	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][1][41] = %hhu.", __FUNCTION__, ((n & 0x2)? 1: 0));
 	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][3][41] = %hhu.", __FUNCTION__, ((n & 0x1)? 1: 0));
+	log4cpp::Category::getInstance(logcat).debug("%s: selected counter = %lu.", __FUNCTION__, n);
 
 
 	/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
@@ -1033,7 +1054,7 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 		log4cpp::Category::getInstance(logcat).notice("%s: (U0_b49 ^ U3_b49) != v[1]; U0 failure.", __FUNCTION__);
 }
 
-static const size_t keys = 1, attacks = u03_ceiling_pow_2_33p9;
+static const size_t keys = 1, attacks = 50;//pow(2,22);
 
 int attack_u03_bit0_test0(const char * logcat)
 {

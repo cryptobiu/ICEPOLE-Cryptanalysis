@@ -146,7 +146,7 @@ int pi_rho_mu(const unsigned char * c, unsigned char * c_)
 
 	ICESTATE Ss, Sp, Sr, Sm;
 
-	memset(&Ss, 0, sizeof(ICESTATE));
+	memset(Ss, 0, sizeof(ICESTATE));
 	memcpy(Ss, c, 16*sizeof(u_int64_t));
 
 	Mu(Sm, Ss);
