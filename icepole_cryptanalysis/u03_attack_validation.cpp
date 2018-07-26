@@ -88,7 +88,7 @@ int validate_generated_input_1st_constraint(const size_t thd_id, const u_int64_t
 	return 0;
 }
 
-int validate_generated_input_2nd_constraint(const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+int validate_generated_input_2nd_constraint(const size_t thd_id, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
 {
 	/*
 	// 2nd constraint - XOR of all the masked bits below should equal 1
@@ -101,7 +101,8 @@ int validate_generated_input_2nd_constraint(const u_int64_t * PxorIS, const u_in
 	};
 	(0,1) , (1,0) , (2,1) , (3,0) , (3,2)
 	*/
-	if(0 == (0x0000000800000000 & (RC2I(PxorIS,0,1) ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,2,1) ^ RC2I(PxorIS,3,0) ^ RC2I(PxorIS,3,2))))
+	u_int64_t mask = left_rotate(0x0000000800000000, thd_id);
+	if(0 == (mask & (RC2I(PxorIS,0,1) ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,2,1) ^ RC2I(PxorIS,3,0) ^ RC2I(PxorIS,3,2))))
 		return -1;
 	return 0;
 }
@@ -161,7 +162,7 @@ void validate_generated_input_1(const u_int64_t * P, const u_int64_t init_state[
 		exit(-1);
 	}
 
-	if(0 != validate_generated_input_2nd_constraint(PxorIS, init_state, logcat))
+	if(0 != validate_generated_input_2nd_constraint(0, PxorIS, init_state, logcat))
 	{
 		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 2nd constraint violation.", __FUNCTION__);
 		log_block("P", P, logcat, 0);
