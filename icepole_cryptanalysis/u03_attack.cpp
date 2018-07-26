@@ -46,11 +46,6 @@ void * u03_attacker_hack(void * arg);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t id);
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
 
-#define KEY_SIZE			16
-#define BLOCK_SIZE			128
-#define BLONG_SIZE			16
-#define ICEPOLE_TAG_SIZE	16
-
 const size_t u03_thread_count = 64;
 
 const u_int64_t u03_ceiling_pow_2_33p9 = 16029384739;

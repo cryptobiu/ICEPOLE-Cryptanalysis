@@ -107,7 +107,7 @@ int validate_generated_input_2nd_constraint(const size_t thd_id, const u_int64_t
 	return 0;
 }
 
-int validate_generated_input_3rd_constraint(const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+int validate_generated_input_3rd_constraint(const size_t thd_id, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
 {
 	/*
 	// 3rd constraint - XOR of all the masked bits below should equal 0
@@ -120,12 +120,13 @@ int validate_generated_input_3rd_constraint(const u_int64_t * PxorIS, const u_in
 	};
 	(0,2) , (1,3) , (2,3) , (3,3)
 	*/
-	if(0 != (0x0000000200000000 & (RC2I(PxorIS,0,2) ^ RC2I(PxorIS,1,3) ^ RC2I(PxorIS,2,3) ^ RC2I(PxorIS,3,3))))
+	u_int64_t mask = left_rotate(0x0000000200000000, thd_id);
+	if(0 != (mask & (RC2I(PxorIS,0,2) ^ RC2I(PxorIS,1,3) ^ RC2I(PxorIS,2,3) ^ RC2I(PxorIS,3,3))))
 		return -1;
 	return 0;
 }
 
-int validate_generated_input_4th_constraint(const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+int validate_generated_input_4th_constraint(const size_t thd_id, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
 {
 	/*
 	// 4th constraint - XOR of all the masked bits below should equal 0
@@ -138,7 +139,8 @@ int validate_generated_input_4th_constraint(const u_int64_t * PxorIS, const u_in
 	};
 	(0,2) , (1,3) , (2,3) , (3,3)
 	*/
-	if(0 != (0x0000000000000001 & (RC2I(PxorIS,0,2) ^ RC2I(PxorIS,1,3) ^ RC2I(PxorIS,2,3) ^ RC2I(PxorIS,3,3))))
+	u_int64_t mask = left_rotate(0x0000000000000001, thd_id);
+	if(0 != (mask & (RC2I(PxorIS,0,2) ^ RC2I(PxorIS,1,3) ^ RC2I(PxorIS,2,3) ^ RC2I(PxorIS,3,3))))
 		return -1;
 	return 0;
 }
@@ -170,7 +172,7 @@ void validate_generated_input_1(const u_int64_t * P, const u_int64_t init_state[
 		exit(-1);
 	}
 
-	if(0 != validate_generated_input_3rd_constraint(PxorIS, init_state, logcat))
+	if(0 != validate_generated_input_3rd_constraint(0, PxorIS, init_state, logcat))
 	{
 		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 3rd constraint violation.", __FUNCTION__);
 		log_block("P", P, logcat, 0);
@@ -178,7 +180,7 @@ void validate_generated_input_1(const u_int64_t * P, const u_int64_t init_state[
 		exit(-1);
 	}
 
-	if(0 != validate_generated_input_4th_constraint(PxorIS, init_state, logcat))
+	if(0 != validate_generated_input_4th_constraint(0, PxorIS, init_state, logcat))
 	{
 		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 4th constraint violation.", __FUNCTION__);
 		log_block("P", P, logcat, 0);
