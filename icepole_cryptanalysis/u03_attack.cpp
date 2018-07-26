@@ -938,7 +938,7 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 
 	generate_inputs(P1, P2, prg, 0, init_state);
 
-	validate_generated_input_1(P1, init_state, logcat);
+	validate_generated_input_1(0, P1, init_state, logcat);
 	validate_generated_input_2(P1, P2, logcat);
 
 	/**/
