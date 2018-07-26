@@ -235,15 +235,15 @@ int validate_inputs_diff(const size_t thd_id, int i, int j, const u_int64_t P1v,
 	return 0;
 }
 
-void validate_generated_input_2(const u_int64_t * P1, const u_int64_t * P2, const char * logcat)
+void validate_generated_input_2(const size_t thd_id, const u_int64_t * P1, const u_int64_t * P2, const char * logcat)
 {
 	for(int i = 0; i < 4; ++i)
 	{
 		for(int j = 0; j < 4; ++j)
 		{
-			if(0 != validate_inputs_diff(0, i, j, RC2I(P1,i,j), RC2I(P2,i,j), logcat))
+			if(0 != validate_inputs_diff(thd_id, i, j, RC2I(P1,i,j), RC2I(P2,i,j), logcat))
 			{
-				log4cpp::Category::getInstance(logcat).fatal("%s: generated inputs diff violation @[%d:%d].", __FUNCTION__, i, j);
+				log4cpp::Category::getInstance(logcat).fatal("%s: generated inputs diff violation @[%d:%d]; id=%lu..", __FUNCTION__, i, j, thd_id);
 				log_block("P1", P1, logcat, 0);
 				log_block("P2", P2, logcat, 0);
 				exit(-1);
