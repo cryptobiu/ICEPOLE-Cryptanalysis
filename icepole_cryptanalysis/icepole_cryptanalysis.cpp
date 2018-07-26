@@ -36,7 +36,6 @@ void cryptanalysis();
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3);
 
 int attack_u03_bit0_test0(const char * logcat);
-int attack_u03_bit0_test1(const char * logcat);
 
 static const char * logcat = "ca4ip.log";
 

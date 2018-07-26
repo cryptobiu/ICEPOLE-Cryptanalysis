@@ -7,7 +7,7 @@
 
 #include "icepole128av2/ref/encrypt.h"
 
-#define RC2I(arr,x,y) arr[x + 4*y]
+#include "util.h"
 
 void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat, const int level)
 {
@@ -68,7 +68,7 @@ void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64
 	}
 }
 
-int validate_generated_input_1st_constraint(const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+int validate_generated_input_1st_constraint(const size_t thd_id, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
 {
 	/*
 	// 1st constraint - XOR of all the masked bits below should equal 1
@@ -82,7 +82,8 @@ int validate_generated_input_1st_constraint(const u_int64_t * PxorIS, const u_in
 	(0,1) , (1,0) , (2,1) , (3,0) , (3,2)
 	*/
 
-	if(0 == (0x0000000000000010 & (RC2I(PxorIS,0,1) ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,2,1) ^ RC2I(PxorIS,3,0) ^ RC2I(PxorIS,3,2))))
+	u_int64_t mask = left_rotate(0x0000000000000010, thd_id);
+	if(0 == (mask & (RC2I(PxorIS,0,1) ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,2,1) ^ RC2I(PxorIS,3,0) ^ RC2I(PxorIS,3,2))))
 		return -1;
 	return 0;
 }
@@ -152,7 +153,7 @@ void validate_generated_input_1(const u_int64_t * P, const u_int64_t init_state[
 		}
 	}
 
-	if(0 != validate_generated_input_1st_constraint(PxorIS, init_state, logcat))
+	if(0 != validate_generated_input_1st_constraint(0, PxorIS, init_state, logcat))
 	{
 		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 1st constraint violation.", __FUNCTION__);
 		log_block("P", P, logcat, 0);
