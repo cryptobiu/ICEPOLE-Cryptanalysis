@@ -34,9 +34,9 @@ typedef struct
 void sigint_cb(evutil_socket_t, short, void *);
 void timer_cb(evutil_socket_t, short, void *);
 void * u03_attacker(void *);
-int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_block[4][5]);
-int generate_input_p2(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE]);
-int generate_inputs(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], aes_prg & prg, const size_t id, const u_int64_t init_block[4][5]);
+int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_block[4][5], const char * logcat);
+int generate_input_p2(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
+int generate_inputs(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], aes_prg & prg, const u_int64_t init_block[4][5], const char * logcat);
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
@@ -287,7 +287,7 @@ void * u03_attacker(void * arg)
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
 	{
-		generate_inputs(P1, P2, prg, prm->id, prm->init_block);
+		generate_inputs(prm->id, P1, P2, prg, prm->init_block, prm->locat.c_str());
 
 		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
@@ -373,30 +373,36 @@ void * u03_attacker(void * arg)
 	return NULL;
 }
 
-int generate_inputs(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], aes_prg & prg, const size_t id, const u_int64_t init_block[4][5])
+int generate_inputs(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], aes_prg & prg, const u_int64_t init_block[4][5], const char * logcat)
 {
-	generate_input_p1(P1, prg, init_block);
-	generate_input_p2(P1, P2);
+	generate_input_p1(P1, prg, init_block, logcat);
+	generate_input_p2(P1, P2, logcat);
 
 	//shift the input in accordance with the thread id
 	for(size_t i = 0; i < BLONG_SIZE; ++i)
 	{
-		P1[i] = left_rotate(P1[i], id);
-		P2[i] = left_rotate(P2[i], id);
+		P1[i] = left_rotate(P1[i], thd_id);
+		P2[i] = left_rotate(P2[i], thd_id);
 	}
+	log_block("P1shft", P1, logcat, 700);
+	log_block("P2shft", P2, logcat, 700);
 	return 0;
 }
 
-int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_block[4][5])
+int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat)
 {
 	//Generation of random bytes in P1
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
 
-	//XOR of P1 with the icepole init block into P1_ib_xor
-	u_int64_t P1_ib_xor[BLONG_SIZE];
+	log_block("P1rnd", P1, logcat, 700);
+
+	//XOR of P1 with the icepole init block into P1xIS
+	u_int64_t P1xIS[BLONG_SIZE];
 	for(size_t i = 0; i < 4; ++i)
 		for(size_t j = 0; j < 4; ++j)
-			RC2I(P1_ib_xor,i,j) = RC2I(P1,i,j) ^ init_block[i][j];
+			RC2I(P1xIS,i,j) = RC2I(P1,i,j) ^ init_state[i][j];
+
+	log_block("P1xIS", P1xIS, logcat, 700);
 
 	{	/* set 1st constraint
 		const u_int64_t u03_P1_1st_constraint[16] =
@@ -407,12 +413,15 @@ int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t i
 			0x0000000000000010, 0x0000000000000000, 0x0000000000000010, 0x0000000000000000, //0x0000000000000000,
 		}; */
 		u_int64_t mask = 0x0000000000000010;
-		if (0 == (	(RC2I(P1_ib_xor,0,1) & mask) ^
-					(RC2I(P1_ib_xor,1,0) & mask) ^
-					(RC2I(P1_ib_xor,2,1) & mask) ^
-					(RC2I(P1_ib_xor,3,0) & mask) ^
-					(RC2I(P1_ib_xor,3,2) & mask)))
-		RC2I(P1,3,2) ^= mask;
+		if (0 == (	(RC2I(P1xIS,0,1) & mask) ^
+					(RC2I(P1xIS,1,0) & mask) ^
+					(RC2I(P1xIS,2,1) & mask) ^
+					(RC2I(P1xIS,3,0) & mask) ^
+					(RC2I(P1xIS,3,2) & mask)))
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: PxIS 1st constraint fixed.", __FUNCTION__);
+			RC2I(P1,3,2) ^= mask;
+		}
 	}
 
 	{	/* set 2nd constraint
@@ -424,12 +433,15 @@ int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t i
 			0x0000000800000000, 0x0000000000000000, 0x0000000800000000, 0x0000000000000000, //0x0000000000000000,
 		}; */
 		u_int64_t mask = 0x0000000800000000;
-		if(0 == (	(RC2I(P1_ib_xor,0,1) & mask) ^
-					(RC2I(P1_ib_xor,1,0) & mask) ^
-					(RC2I(P1_ib_xor,2,1) & mask) ^
-					(RC2I(P1_ib_xor,3,0) & mask) ^
-					(RC2I(P1_ib_xor,3,2) & mask)))
+		if(0 == (	(RC2I(P1xIS,0,1) & mask) ^
+					(RC2I(P1xIS,1,0) & mask) ^
+					(RC2I(P1xIS,2,1) & mask) ^
+					(RC2I(P1xIS,3,0) & mask) ^
+					(RC2I(P1xIS,3,2) & mask)))
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: PxIS 2nd constraint fixed.", __FUNCTION__);
 			RC2I(P1,3,2) ^= mask;
+		}
 	}
 
 	{	/* set 3rd constraint
@@ -441,12 +453,14 @@ int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t i
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
 		}; */
 		u_int64_t mask = 0x0000000200000000;
-		if(mask == (
-					(RC2I(P1_ib_xor,0,2) & mask) ^
-					(RC2I(P1_ib_xor,1,3) & mask) ^
-					(RC2I(P1_ib_xor,2,3) & mask) ^
-					(RC2I(P1_ib_xor,3,3) & mask)))
+		if(mask == (	(RC2I(P1xIS,0,2) & mask) ^
+						(RC2I(P1xIS,1,3) & mask) ^
+						(RC2I(P1xIS,2,3) & mask) ^
+						(RC2I(P1xIS,3,3) & mask)))
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: PxIS 3rd constraint fixed.", __FUNCTION__);
 			RC2I(P1,3,3) ^= mask;
+		}
 	}
 
 	{	/* set 4th constraint
@@ -458,20 +472,24 @@ int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t i
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
 		}; */
 		u_int64_t mask = 0x0000000000000001;
-		if(mask == (
-					(RC2I(P1_ib_xor,0,2) & mask) ^
-					(RC2I(P1_ib_xor,1,3) & mask) ^
-					(RC2I(P1_ib_xor,2,3) & mask) ^
-					(RC2I(P1_ib_xor,3,3) & mask)))
+		if(mask == (	(RC2I(P1xIS,0,2) & mask) ^
+						(RC2I(P1xIS,1,3) & mask) ^
+						(RC2I(P1xIS,2,3) & mask) ^
+						(RC2I(P1xIS,3,3) & mask)))
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: PxIS 4th constraint fixed.", __FUNCTION__);
 			RC2I(P1,3,3) ^= mask;
+		}
 	}
+
+	log_block("P1fix", P1, logcat, 700);
 
 	//set the 2nd block of P1 to zeroes
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
 	return 0;
 }
 
-int generate_input_p2(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE])
+int generate_input_p2(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat)
 {
 	/*
 	const u_int64_t u03_P1_P2_conversion[16] =
@@ -493,6 +511,7 @@ int generate_input_p2(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE])
 	RC2I(P2,2,3) ^= 0x1;
 	RC2I(P2,3,0) ^= 0x1;
 	RC2I(P2,3,2) ^= 0x1;
+	log_block("P2fix", P2, logcat, 700);
 	return 0;
 }
 
@@ -850,7 +869,7 @@ void * u03_attacker_hack(void * arg)
 	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
 	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
 	{
-		generate_inputs(P1, P2, prg, prm->id, prm->init_block);
+		generate_inputs(prm->id, P1, P2, prg, prm->init_block, prm->locat.c_str());
 
 		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
 		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
@@ -936,7 +955,7 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	u_int64_t x_state[4][5];
 	u_int8_t F1 = 0, F2 = 0;
 
-	generate_inputs(P1, P2, prg, 0, init_state);
+	generate_inputs(0, P1, P2, prg, init_state, logcat);
 
 	validate_generated_input_1(0, P1, init_state, logcat);
 	validate_generated_input_2(0, P1, P2, logcat);
@@ -1083,5 +1102,36 @@ int attack_u03_bit0_test0(const char * logcat)
 
 		guess(logcat, ctr_1, ctr_2, init_state[0][4], init_state[3][4]);
 
+	}
+}
+
+int attack_u03_bit0_test1(const char * logcat)
+{
+	aes_prg prg;
+	if(0 != prg.init(BLOCK_SIZE))
+	{
+		log4cpp::Category::getInstance(logcat).error("%s: prg.init() failure", __FUNCTION__);
+		return -1;
+	}
+
+	u_int8_t key[KEYSIZE], iv[KEYSIZE];
+	prg.gen_rand_bytes(key, KEYSIZE);
+	log_buffer("key", key, KEYSIZE, logcat, 700);
+	prg.gen_rand_bytes(iv, KEYSIZE);
+	log_buffer("iv ", iv, KEYSIZE, logcat, 700);
+
+	u_int64_t init_state[4][5];
+	get_init_block(init_state, key, iv);
+	log_state("IS: ", init_state, logcat, 700);
+
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
+
+	for(int i = 0; i < 64; ++i)
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: input generation test for ID = %lu.", __FUNCTION__, i);
+		generate_inputs(i, P1, P2, prg, init_state, logcat);
+
+		validate_generated_input_1(i, P1, init_state, logcat);
+		validate_generated_input_2(i, P1, P2, logcat);
 	}
 }

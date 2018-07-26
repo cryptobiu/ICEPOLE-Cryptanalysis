@@ -70,8 +70,7 @@ void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64
 
 int validate_generated_input_1st_constraint(const size_t thd_id, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
 {
-	/*
-	// 1st constraint - XOR of all the masked bits below should equal 1
+	/* 1st constraint - XOR of all the masked bits below should equal 1
 	const u_int64_t u03_P1_1st_constraint[16] =
 	{
 		0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
@@ -79,8 +78,7 @@ int validate_generated_input_1st_constraint(const size_t thd_id, const u_int64_t
 		0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
 		0x0000000000000010, 0x0000000000000000, 0x0000000000000010, 0x0000000000000000, //0x0000000000000000,
 	};
-	(0,1) , (1,0) , (2,1) , (3,0) , (3,2)
-	*/
+	(0,1) , (1,0) , (2,1) , (3,0) , (3,2) */
 
 	u_int64_t mask = left_rotate(0x0000000000000010, thd_id);
 	if(0 == (mask & (RC2I(PxorIS,0,1) ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,2,1) ^ RC2I(PxorIS,3,0) ^ RC2I(PxorIS,3,2))))
@@ -90,8 +88,7 @@ int validate_generated_input_1st_constraint(const size_t thd_id, const u_int64_t
 
 int validate_generated_input_2nd_constraint(const size_t thd_id, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
 {
-	/*
-	// 2nd constraint - XOR of all the masked bits below should equal 1
+	/* 2nd constraint - XOR of all the masked bits below should equal 1
 	const u_int64_t u03_P1_2nd_constraint[16] =
 	{
 		0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
@@ -99,8 +96,8 @@ int validate_generated_input_2nd_constraint(const size_t thd_id, const u_int64_t
 		0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
 		0x0000000800000000, 0x0000000000000000, 0x0000000800000000, 0x0000000000000000, //0x0000000000000000,
 	};
-	(0,1) , (1,0) , (2,1) , (3,0) , (3,2)
-	*/
+	(0,1) , (1,0) , (2,1) , (3,0) , (3,2) */
+
 	u_int64_t mask = left_rotate(0x0000000800000000, thd_id);
 	if(0 == (mask & (RC2I(PxorIS,0,1) ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,2,1) ^ RC2I(PxorIS,3,0) ^ RC2I(PxorIS,3,2))))
 		return -1;
@@ -152,7 +149,7 @@ void validate_generated_input_1(const size_t thd_id, const u_int64_t * P, const 
 	{
 		for(int j = 0; j < 4; ++j)
 		{
-			RC2I(PxorIS, i, j) = RC2I(P, i, j) ^ init_state[i][j];
+			RC2I(PxorIS, i, j) = RC2I(P, i, j) ^ left_rotate(init_state[i][j], thd_id);
 		}
 	}
 
@@ -210,23 +207,23 @@ int validate_inputs_diff(const size_t thd_id, int i, int j, const u_int64_t P1v,
 	RC2I(P2,3,0) ^= 0x1;
 	RC2I(P2,3,2) ^= 0x1;
 	*/
-	u_int64_t rP1v = left_rotate(P1v, thd_id), rP2v = left_rotate(P2v, thd_id), positive = left_rotate(1, thd_id);
+	u_int64_t positive = left_rotate(1, thd_id);
 	switch(i)
 	{
 	case 0:
-		if(j == 2 && (rP1v^rP2v) != positive)
+		if(j == 2 && (P1v^P2v) != positive)
 			return -1;
 		break;
 	case 1:
-		if((rP1v^rP2v) != positive)
+		if((P1v^P2v) != positive)
 			return -1;
 		break;
 	case 2:
-		if((j == 1 || j == 3) && (rP1v^rP2v) != positive)
+		if((j == 1 || j == 3) && (P1v^P2v) != positive)
 			return -1;
 		break;
 	case 3:
-		if((j == 0 || j == 2) && (rP1v^rP2v) != positive)
+		if((j == 0 || j == 2) && (P1v^P2v) != positive)
 			return -1;
 		break;
 	default:
@@ -243,7 +240,7 @@ void validate_generated_input_2(const size_t thd_id, const u_int64_t * P1, const
 		{
 			if(0 != validate_inputs_diff(thd_id, i, j, RC2I(P1,i,j), RC2I(P2,i,j), logcat))
 			{
-				log4cpp::Category::getInstance(logcat).fatal("%s: generated inputs diff violation @[%d:%d]; id=%lu..", __FUNCTION__, i, j, thd_id);
+				log4cpp::Category::getInstance(logcat).fatal("%s: generated inputs diff violation @[%d:%d]; id=%lu.", __FUNCTION__, i, j, thd_id);
 				log_block("P1", P1, logcat, 0);
 				log_block("P2", P2, logcat, 0);
 				exit(-1);
