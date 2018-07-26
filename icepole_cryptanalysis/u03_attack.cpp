@@ -34,7 +34,9 @@ typedef struct
 void sigint_cb(evutil_socket_t, short, void *);
 void timer_cb(evutil_socket_t, short, void *);
 void * u03_attacker(void *);
-int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id, const u_int64_t init_block[4][5]);
+int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_block[4][5]);
+int generate_input_p2(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE]);
+int generate_inputs(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], aes_prg & prg, const size_t id, const u_int64_t init_block[4][5]);
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
@@ -371,7 +373,21 @@ void * u03_attacker(void * arg)
 	return NULL;
 }
 
-int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t id, const u_int64_t init_block[4][5])
+int generate_inputs(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], aes_prg & prg, const size_t id, const u_int64_t init_block[4][5])
+{
+	generate_input_p1(P1, prg, init_block);
+	generate_input_p2(P1, P2);
+
+	//shift the input in accordance with the thread id
+	for(size_t i = 0; i < BLONG_SIZE; ++i)
+	{
+		P1[i] = left_rotate(P1[i], id);
+		P2[i] = left_rotate(P2[i], id);
+	}
+	return 0;
+}
+
+int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_block[4][5])
 {
 	//Generation of random bytes in P1
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
@@ -382,19 +398,16 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		for(size_t j = 0; j < 4; ++j)
 			RC2I(P1_ib_xor,i,j) = RC2I(P1,i,j) ^ init_block[i][j];
 
-	{	//set 1st constraint
-		/*
+	{	/* set 1st constraint
 		const u_int64_t u03_P1_1st_constraint[16] =
 		{
 			0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
 			0x0000000000000010, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
 			0x0000000000000000, 0x0000000000000010, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
 			0x0000000000000010, 0x0000000000000000, 0x0000000000000010, 0x0000000000000000, //0x0000000000000000,
-		};
-		*/
+		}; */
 		u_int64_t mask = 0x0000000000000010;
-		if (0 == (
-					(RC2I(P1_ib_xor,0,1) & mask) ^
+		if (0 == (	(RC2I(P1_ib_xor,0,1) & mask) ^
 					(RC2I(P1_ib_xor,1,0) & mask) ^
 					(RC2I(P1_ib_xor,2,1) & mask) ^
 					(RC2I(P1_ib_xor,3,0) & mask) ^
@@ -402,19 +415,16 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		RC2I(P1,3,2) ^= mask;
 	}
 
-	{	//set 2nd constraint
-		/*
+	{	/* set 2nd constraint
 		const u_int64_t u03_P1_2nd_constraint[16] =
 		{
 			0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
 			0x0000000800000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
 			0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
 			0x0000000800000000, 0x0000000000000000, 0x0000000800000000, 0x0000000000000000, //0x0000000000000000,
-		};
-		*/
+		}; */
 		u_int64_t mask = 0x0000000800000000;
-		if(0 == (
-					(RC2I(P1_ib_xor,0,1) & mask) ^
+		if(0 == (	(RC2I(P1_ib_xor,0,1) & mask) ^
 					(RC2I(P1_ib_xor,1,0) & mask) ^
 					(RC2I(P1_ib_xor,2,1) & mask) ^
 					(RC2I(P1_ib_xor,3,0) & mask) ^
@@ -422,16 +432,14 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 			RC2I(P1,3,2) ^= mask;
 	}
 
-	{	//set 3rd constraint
-		/*
+	{	/* set 3rd constraint
 		const u_int64_t u03_P1_3rd_constraint[16] =
 		{
 			0x0000000000000000, 0x0000000000000000, 0x0000000200000000, 0x0000000000000000, //0x0000000000000000,
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000200000000, //0x0000000000000000,
-		};
-		*/
+		}; */
 		u_int64_t mask = 0x0000000200000000;
 		if(mask == (
 					(RC2I(P1_ib_xor,0,2) & mask) ^
@@ -441,16 +449,14 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 			RC2I(P1,3,3) ^= mask;
 	}
 
-	{	//set 4th constraint
-		/*
+	{	/* set 4th constraint
 		const u_int64_t u03_P1_4th_constraint[16] =
 		{
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000001, 0x0000000000000000, //0x0000000000000000,
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
 			0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000001, //0x0000000000000000,
-		};
-		 */
+		}; */
 		u_int64_t mask = 0x0000000000000001;
 		if(mask == (
 					(RC2I(P1_ib_xor,0,2) & mask) ^
@@ -462,7 +468,11 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 
 	//set the 2nd block of P1 to zeroes
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
+	return 0;
+}
 
+int generate_input_p2(u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE])
+{
 	/*
 	const u_int64_t u03_P1_P2_conversion[16] =
 	{
@@ -470,11 +480,9 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 		0x1, 0x1, 0x1, 0x1, //0x0,
 		0x0, 0x1, 0x0, 0x1, //0x0,
 		0x1, 0x0, 0x1, 0x0, //0x0,
-	};
-	*/
+	}; */
 
-	//copy P1 onto P2 and modify
-	//the bits by the conversion mask
+	//copy P1 onto P2 and modify the bits by the conversion mask
 	memcpy(P2, P1, 2 * BLOCK_SIZE);
 	RC2I(P2,0,2) ^= 0x1;
 	RC2I(P2,1,0) ^= 0x1;
@@ -485,13 +493,7 @@ int generate_inputs(u_int64_t * P1, u_int64_t * P2, aes_prg & prg, const size_t 
 	RC2I(P2,2,3) ^= 0x1;
 	RC2I(P2,3,0) ^= 0x1;
 	RC2I(P2,3,2) ^= 0x1;
-
-	//shift the input in accordance with the thread id
-	for(size_t i = 0; i < BLONG_SIZE; ++i)
-	{
-		P1[i] = left_rotate(P1[i], id);
-		P2[i] = left_rotate(P2[i], id);
-	}
+	return 0;
 }
 
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * P_perm_output)
