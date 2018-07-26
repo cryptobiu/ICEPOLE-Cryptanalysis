@@ -190,7 +190,7 @@ void validate_generated_input_1(const size_t thd_id, const u_int64_t * P, const 
 	log4cpp::Category::getInstance(logcat).info("%s: generated input 4 constraints check out.", __FUNCTION__);
 }
 
-int validate_inputs_diff(int i, int j, const u_int64_t P1v, const u_int64_t P2v, const char * logcat)
+int validate_inputs_diff(const size_t thd_id, int i, int j, const u_int64_t P1v, const u_int64_t P2v, const char * logcat)
 {
 	/*
 	const u_int64_t u03_P1_P2_conversion[16] =
@@ -210,22 +210,23 @@ int validate_inputs_diff(int i, int j, const u_int64_t P1v, const u_int64_t P2v,
 	RC2I(P2,3,0) ^= 0x1;
 	RC2I(P2,3,2) ^= 0x1;
 	*/
+	u_int64_t rP1v = left_rotate(P1v, thd_id), rP2v = left_rotate(P2v, thd_id), positive = left_rotate(1, thd_id);
 	switch(i)
 	{
 	case 0:
-		if(j == 2 && (P1v^P2v) != 1)
+		if(j == 2 && (rP1v^rP2v) != positive)
 			return -1;
 		break;
 	case 1:
-		if((P1v^P2v) != 1)
+		if((rP1v^rP2v) != positive)
 			return -1;
 		break;
 	case 2:
-		if((j == 1 || j == 3) && (P1v^P2v) != 1)
+		if((j == 1 || j == 3) && (rP1v^rP2v) != positive)
 			return -1;
 		break;
 	case 3:
-		if((j == 0 || j == 2) && (P1v^P2v) != 1)
+		if((j == 0 || j == 2) && (rP1v^rP2v) != positive)
 			return -1;
 		break;
 	default:
@@ -240,7 +241,7 @@ void validate_generated_input_2(const u_int64_t * P1, const u_int64_t * P2, cons
 	{
 		for(int j = 0; j < 4; ++j)
 		{
-			if(0 != validate_inputs_diff(i, j, RC2I(P1,i,j), RC2I(P2,i,j), logcat))
+			if(0 != validate_inputs_diff(0, i, j, RC2I(P1,i,j), RC2I(P2,i,j), logcat))
 			{
 				log4cpp::Category::getInstance(logcat).fatal("%s: generated inputs diff violation @[%d:%d].", __FUNCTION__, i, j);
 				log_block("P1", P1, logcat, 0);
