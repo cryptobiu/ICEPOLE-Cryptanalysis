@@ -250,7 +250,7 @@ void validate_generated_input_2(const size_t thd_id, const u_int64_t * P1, const
 	log4cpp::Category::getInstance(logcat).info("%s: generated inputs XOR diff check out.", __FUNCTION__);
 }
 
-void validate_state_bits(const u_int64_t x_state[4][5], const u_int8_t F, const char * logcat)
+void validate_state_bits(const size_t thd_id, const u_int64_t x_state[4][5], const u_int8_t F, const char * logcat)
 {
 	static const u_int64_t state_xor_bitmask[4][5] =
 	{
@@ -265,7 +265,7 @@ void validate_state_bits(const u_int64_t x_state[4][5], const u_int8_t F, const 
 	{
 		for(int j = 0; j < 5; ++j)
 		{
-			if(0 != (x_state[i][j] & state_xor_bitmask[i][j]))
+			if(0 != (x_state[i][j] & left_rotate(state_xor_bitmask[i][j], thd_id)))
 				control ^= 1;
 		}
 	}
