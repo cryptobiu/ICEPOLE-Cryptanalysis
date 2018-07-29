@@ -22,21 +22,17 @@
 #include <log4cpp/PatternLayout.hh>
 
 #include "aes_prg.h"
+#include "util.h"
 
 #include "icepole128av2/ref/encrypt.h"
-
-#define KEYSIZE		16
-#define BLOCKSIZE	128
 
 void get_options(int argc, char *argv[], int * log_level);
 void show_usage(const char * prog);
 void init_log(const char * a_log_file, const char * a_log_dir, const int log_level, const char * logcat);
-u_int64_t left_rotate(u_int64_t v, size_t r);
 void cryptanalysis();
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3);
 
-int attack_u03_bit0_test0(const char * logcat);
-int attack_u03_bit0_test1(const char * logcat);
+//int attack_u03_bit0_test0(const char * logcat);
 
 static const char * logcat = "ca4ip.log";
 
@@ -118,13 +114,13 @@ void init_log(const char * a_log_file, const char * a_log_dir, const int log_lev
 
 void cryptanalysis()
 {
-	static const u_int8_t key[KEYSIZE] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
-	static const u_int8_t iv[KEYSIZE] = { 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
+	static const u_int8_t key[KEY_SIZE] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
+	static const u_int8_t iv[KEY_SIZE] = { 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
 
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
 
-	if(0 != attack_u03_bit0_test0(logcat))
+	if(0 != attack_u03(logcat, key, iv, U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03_bit0_test() failure.", __FUNCTION__);
 		return;
