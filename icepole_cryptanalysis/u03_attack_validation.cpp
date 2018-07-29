@@ -285,20 +285,20 @@ void validate_counter_bits(const size_t thd_id, const u_int64_t * C, const size_
 
 	pi_rho_mu((const unsigned char *)C, (unsigned char *)LC);
 
-	u_int64_t mask_41_id = left_rotate(0x1, 41 + thd_id);
+	u_int64_t bit_offset = 41 + thd_id;
+	u_int64_t mask_41_id = left_rotate(0x1, bit_offset);
 
 	u_int64_t bit_3_1_41_id = (0 == (RC2I(LC,3,1) & mask_41_id))? 0: 1;
 	u_int64_t bit_3_3_41_id = (0 == (RC2I(LC,3,3) & mask_41_id))? 0: 1;
 
 	if(n != ((bit_3_1_41_id << 1) | bit_3_3_41_id))
 	{
-		log4cpp::Category::getInstance(logcat).fatal("%s: counter bits mismatch; n = %lu; bit_3_1_41_id = %lu; bit_3_3_41_id = %lu;",
-				__FUNCTION__, n, bit_3_1_41_id, bit_3_3_41_id);
+		log4cpp::Category::getInstance(logcat).fatal("%s: counter bits mismatch; n = %lu; bit_3_1_%lu = %lu; bit_3_3_%lu = %lu;",
+				__FUNCTION__, n, bit_offset, bit_3_1_41_id, bit_offset, bit_3_3_41_id);
 		log_block("C", C, logcat, 0);
 		log_block("LC", LC, logcat, 0);
 		exit(-1);
 	}
-	/**/
 	else
 	{
 		//log_block("C", C, logcat, 700);
@@ -306,10 +306,10 @@ void validate_counter_bits(const size_t thd_id, const u_int64_t * C, const size_
 
 		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][1] = 0x%016lX; LC[3][3] = 0x%016lX; ",
 				__FUNCTION__, RC2I(LC,3,1), RC2I(LC,3,3));
-		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][1][41] = 0x%016lX & 0x%016lX = 0x%016lX",
-				__FUNCTION__, RC2I(LC,3,1), (0x1UL << 41), (RC2I(LC,3,1) & (0x1UL << 41)));
-		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][3][41] = 0x%016lX & 0x%016lX = 0x%016lX",
-				__FUNCTION__, RC2I(LC,3,3), (0x1UL << 41), (RC2I(LC,3,3) & (0x1UL << 41)));
+		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][1][%lu] = 0x%016lX & 0x%016lX = 0x%016lX",
+				__FUNCTION__, bit_offset, RC2I(LC,3,1), mask_41_id, (RC2I(LC,3,1) & mask_41_id));
+		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][3][%lu] = 0x%016lX & 0x%016lX = 0x%016lX",
+				__FUNCTION__, bit_offset, RC2I(LC,3,3), mask_41_id, (RC2I(LC,3,3) & mask_41_id));
 
 		log4cpp::Category::getInstance(logcat).debug("%s: counter bits match; n = %lu; bit_3_1_41_id = %lu; bit_3_3_41_id = %lu;",
 				__FUNCTION__, n, bit_3_1_41_id, bit_3_3_41_id);

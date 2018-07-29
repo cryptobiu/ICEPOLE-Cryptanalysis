@@ -917,80 +917,79 @@ u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t id)
 	return result;
 }
 
-//void attack_key(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-//				const u_int64_t init_state[4][5], aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4],
-//				const size_t thd_id)
-//{
-//	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
-//	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
-//	unsigned long long clen;
-//
-//	u_int64_t x_state[4][5];
-//	u_int8_t F1 = 0, F2 = 0;
-//
-//	generate_inputs(thd_id, P1, P2, prg, init_state, logcat);
-//
-//	validate_generated_input_1(thd_id, P1, init_state, logcat);
-//	validate_generated_input_2(thd_id, P1, P2, logcat);
-//
-//	/**/
-//	log_block("P1-0", P1, logcat, 700);
-//	log_block("P1-1", P1+BLONG_SIZE, logcat, 700);
-//	log_block("P2-0", P2, logcat, 700);
-//	log_block("P2-1", P2+BLONG_SIZE, logcat, 700);
-//
-//
-//	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
-//	crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-//
-//	validate_init_state(P1, C1, init_state, logcat);
-//
-//	/**/
-//	log_block("C1-0", C1, logcat, 700);
-//	log_block("C1-1", C1+BLONG_SIZE, logcat, 700);
-//	log_state("x-state-1", x_state, logcat, 700);
-//
-//
-//	F1 = xor_state_bits(x_state, thd_id);
-//	log4cpp::Category::getInstance(logcat).debug("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, F1);
-//	validate_state_bits(thd_id, x_state, F1, logcat);
-//
-//	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
-//	crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-//
-//	validate_init_state(P2, C2, init_state, logcat);
-//
-//	/**/
-//	log_block("C2-0", C2, logcat, 700);
-//	log_block("C2-1", C2+BLONG_SIZE, logcat, 700);
-//	log_state("x-state-2", x_state, logcat, 700);
-//
-//
-//	F2 = xor_state_bits(x_state, thd_id);
-//	log4cpp::Category::getInstance(logcat).debug("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
-//	validate_state_bits(thd_id, x_state, F2, logcat);
-//
-//	size_t n = lookup_counter_bits(thd_id, C1);
-//	validate_counter_bits(thd_id, C1, n, logcat);
-//
-//	/**/
-//	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][1][41] = %hhu.", __FUNCTION__, ((n & 0x2)? 1: 0));
-//	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][3][41] = %hhu.", __FUNCTION__, ((n & 0x1)? 1: 0));
-//	log4cpp::Category::getInstance(logcat).debug("%s: selected counter = %lu.", __FUNCTION__, n);
-//
-//
-//	/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
-//	 */
-//	ctr_1[n]++;
-//
-//	/*
-//	 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
-//	 */
-//	if(F1 == F2)
-//		ctr_2[n]++;
-//}
+void attack_key(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
+				const u_int64_t init_state[4][5], aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4],
+				const size_t thd_id)
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
+	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
 
-/*
+	u_int64_t x_state[4][5];
+	u_int8_t F1 = 0, F2 = 0;
+
+	generate_inputs(thd_id, P1, P2, prg, init_state, logcat);
+
+	validate_generated_input_1(thd_id, P1, init_state, logcat);
+	validate_generated_input_2(thd_id, P1, P2, logcat);
+
+	/**/
+	log_block("P1-0", P1, logcat, 700);
+	log_block("P1-1", P1+BLONG_SIZE, logcat, 700);
+	log_block("P2-0", P2, logcat, 700);
+	log_block("P2-1", P2+BLONG_SIZE, logcat, 700);
+
+
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+
+	validate_init_state(P1, C1, init_state, logcat);
+
+	/**/
+	log_block("C1-0", C1, logcat, 700);
+	log_block("C1-1", C1+BLONG_SIZE, logcat, 700);
+	log_state("x-state-1", x_state, logcat, 700);
+
+
+	F1 = xor_state_bits(x_state, thd_id);
+	log4cpp::Category::getInstance(logcat).debug("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, F1);
+	validate_state_bits(thd_id, x_state, F1, logcat);
+
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+
+	validate_init_state(P2, C2, init_state, logcat);
+
+	/**/
+	log_block("C2-0", C2, logcat, 700);
+	log_block("C2-1", C2+BLONG_SIZE, logcat, 700);
+	log_state("x-state-2", x_state, logcat, 700);
+
+
+	F2 = xor_state_bits(x_state, thd_id);
+	log4cpp::Category::getInstance(logcat).debug("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
+	validate_state_bits(thd_id, x_state, F2, logcat);
+
+	size_t n = lookup_counter_bits(thd_id, C1);
+	validate_counter_bits(thd_id, C1, n, logcat);
+
+	/**/
+	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][1][%lu] = %hhu.", __FUNCTION__, 41 + thd_id, ((n & 0x2)? 1: 0));
+	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][3][%lu] = %hhu.", __FUNCTION__, 41 + thd_id, ((n & 0x1)? 1: 0));
+	log4cpp::Category::getInstance(logcat).debug("%s: selected counter = %lu.", __FUNCTION__, n);
+
+
+	/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
+	 */
+	ctr_1[n]++;
+
+	/*
+	 * 	If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ].
+	 */
+	if(F1 == F2)
+		ctr_2[n]++;
+}
+
 void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], const u_int64_t U0, const u_int64_t U3, const size_t thd_id)
 {
 	log4cpp::Category::getInstance(logcat).notice("%s: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, U0, U3);
@@ -1024,8 +1023,8 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 	size_t guessed_bit_offset = 31 + thd_id;
 	u_int64_t guessed_bit = v[0]^1, actual_bit = (U3 & left_rotate(0x1, guessed_bit_offset))? 1: 0;
 
-	log4cpp::Category::getInstance(logcat).notice("%s: guessued U3 bit %lu = %lu; actual U3 bit 31 = %lu; U3 %s.",
-				__FUNCTION__, guessed_bit_offset, guessed_bit, actual_bit, ((guessed_bit == actual_bit)? "success": "failure"));
+	log4cpp::Category::getInstance(logcat).notice("%s: guessued U3 bit %lu = %lu; actual U3 bit %lu = %lu; U3 %s.",
+				__FUNCTION__, guessed_bit_offset, guessed_bit, guessed_bit_offset, actual_bit, ((guessed_bit == actual_bit)? "success": "failure"));
 
 	guessed_bit_offset = 49 + thd_id;
 	u_int64_t U0_b49_id = (U0 & left_rotate(0x1, guessed_bit_offset))? 1: 0;
@@ -1039,10 +1038,8 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 	else
 		log4cpp::Category::getInstance(logcat).notice("%s: (U0 bit %lu ^ U3 bit %lu) != v[1]; U0 failure.", __FUNCTION__, guessed_bit_offset, guessed_bit_offset);
 }
-*/
 
-/*
-static const size_t keys = 1, attacks = pow(2,22);
+static const size_t keys = 1, attacks = 50;//pow(2,22);
 
 int attack_u03_bit0_test0(const char * logcat)
 {
@@ -1059,7 +1056,7 @@ int attack_u03_bit0_test0(const char * logcat)
 
 	for(int i = 0; i < keys; ++i)
 	{
-		log4cpp::Category::getInstance(logcat).notice("%s: checking key %d.\n=====================================================================================\n", __FUNCTION__, i);
+		log4cpp::Category::getInstance(logcat).notice("%s: checking key %d.\n====================================================================================================================================================\n", __FUNCTION__, i);
 		prg.gen_rand_bytes(key, KEY_SIZE);
 		log_buffer("key", key, KEY_SIZE, logcat, 700);
 		prg.gen_rand_bytes(iv, KEY_SIZE);
@@ -1069,17 +1066,18 @@ int attack_u03_bit0_test0(const char * logcat)
 		get_init_block(init_state, key, iv);
 		log_state("init_state", init_state, logcat, 700);
 
-		for(size_t id = 0; id < 63; ++id)
+		for(size_t id = 1; id < 6; ++id)
 		{
+			log4cpp::Category::getInstance(logcat).notice("%s: attack on bit at offset %lu.\n****************************************************************************************************************************************************\n", __FUNCTION__, id);
 			size_t ctr_1[4], ctr_2[4];
 			memset(ctr_1, 0, 4 * sizeof(size_t));
 			memset(ctr_2, 0, 4 * sizeof(size_t));
 
 			for(size_t j = 0; j < attacks; ++j)
 			{
-				log4cpp::Category::getInstance(logcat).debug("%s: running attack %lu.\n------------------------------------------------------------------------------------\n", __FUNCTION__, j);
+				log4cpp::Category::getInstance(logcat).debug("%s: running attack %lu.\n----------------------------------------------------------------------------------------------------------------------------------------------------\n", __FUNCTION__, j);
 				attack_key(logcat, key, iv, init_state, prg, ctr_1, ctr_2, id);
-				log4cpp::Category::getInstance(logcat).debug("\n------------------------------------------------------------------------------------\n", __FUNCTION__, j);
+				log4cpp::Category::getInstance(logcat).debug("\n----------------------------------------------------------------------------------------------------------------------------------------------------\n", __FUNCTION__, j);
 			}
 
 			for(size_t j = 0; j < 4; ++j)
@@ -1090,4 +1088,4 @@ int attack_u03_bit0_test0(const char * logcat)
 
 	}
 }
-*/
+
