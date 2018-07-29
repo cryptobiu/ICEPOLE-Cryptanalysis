@@ -41,7 +41,7 @@ int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t *
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
-size_t lookup_counter_bits(const u_int64_t * C, const size_t id);
+size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C);
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 std::string block2text(const u_int64_t * B);
 void * u03_attacker_hack(void * arg);
@@ -328,7 +328,7 @@ void * u03_attacker(void * arg)
 			{
 				/* 	Apply pi & rho & mu on 1st block of C1 and get bits[3][1][41] & [3][3][41]
 				 */
-				size_t n = lookup_counter_bits(C1, prm->id);
+				size_t n = lookup_counter_bits(prm->id, C1);
 
 				/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
 				 */
@@ -736,19 +736,19 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 	return false;
 }
 
-size_t lookup_counter_bits(const u_int64_t * C, const size_t id)
+size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C)
 {
 	u_int64_t LC[BLONG_SIZE];
 	pi_rho_mu((const unsigned char *)C, (unsigned char *)LC);
 
 	u_int8_t bit_3_1_41 = 0;
-	if(RC2I(LC,3,1) & left_rotate(1, 41 + id))
+	if(RC2I(LC,3,1) & left_rotate(1, 41 + thd_id))
 	{
 		bit_3_1_41 = 1;
 	}
 
 	u_int8_t bit_3_3_41 = 0;
-	if(RC2I(LC,3,3) & left_rotate(1, 41 + id))
+	if(RC2I(LC,3,3) & left_rotate(1, 41 + thd_id))
 	{
 		bit_3_3_41 = 1;
 	}
@@ -888,7 +888,7 @@ void * u03_attacker_hack(void * arg)
 			validate_init_state(P2, C2, prm->init_block, prm->locat.c_str());
 		}
 
-		size_t n = lookup_counter_bits(C1, prm->id);
+		size_t n = lookup_counter_bits(prm->id, C1);
 
 		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ].
 		 */
@@ -997,8 +997,8 @@ void attack_key(const char * logcat, const u_int8_t key[KEYSIZE], const u_int8_t
 	log4cpp::Category::getInstance(logcat).debug("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
 	validate_state_bits(0, x_state, F2, logcat);
 
-	size_t n = lookup_counter_bits(C1, 0);
-	validate_counter_bits(C1, n, logcat);
+	size_t n = lookup_counter_bits(0, C1);
+	validate_counter_bits(0, C1, n, logcat);
 
 	/**/
 	log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][1][41] = %hhu.", __FUNCTION__, ((n & 0x2)? 1: 0));
@@ -1130,6 +1130,7 @@ int attack_u03_bit0_test1(const char * logcat)
 
 	u_int64_t x_state[4][5];
 	u_int8_t F1 = 0, F2 = 0;
+	size_t ctr_1[4], ctr_2[4];
 
 	for(int i = 0; i < 64; ++i)
 	{
@@ -1151,5 +1152,32 @@ int attack_u03_bit0_test1(const char * logcat)
 		F1 = xor_state_bits(x_state, i);
 		log4cpp::Category::getInstance(logcat).debug("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, F1);
 		validate_state_bits(i, x_state, F1, logcat);
+
+		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+		crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+
+		validate_init_state(P2, C, init_state, logcat);
+
+		log_block("C2-0", C, logcat, 700);
+		log_block("C2-1", C+BLONG_SIZE, logcat, 700);
+		log_state("x-state-2", x_state, logcat, 700);
+
+		F2 = xor_state_bits(x_state, i);
+		log4cpp::Category::getInstance(logcat).debug("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, F2);
+		validate_state_bits(i, x_state, F2, logcat);
+
+		size_t n = lookup_counter_bits(i, C);
+		validate_counter_bits(i, C, n, logcat);
+
+		log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][1][41] = %hhu.", __FUNCTION__, ((n & 0x2)? 1: 0));
+		log4cpp::Category::getInstance(logcat).debug("%s: counter bit [3][3][41] = %hhu.", __FUNCTION__, ((n & 0x1)? 1: 0));
+		log4cpp::Category::getInstance(logcat).debug("%s: selected counter = %lu.", __FUNCTION__, n);
+
+		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ]. */
+		ctr_1[n]++;
+
+		/* If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ]. */
+		if(F1 == F2)
+			ctr_2[n]++;
 	}
 }

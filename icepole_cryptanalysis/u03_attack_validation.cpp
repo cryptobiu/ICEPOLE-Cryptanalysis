@@ -279,19 +279,21 @@ void validate_state_bits(const size_t thd_id, const u_int64_t x_state[4][5], con
 	log4cpp::Category::getInstance(logcat).info("%s: x-state XOR bits check out.", __FUNCTION__);
 }
 
-void validate_counter_bits(const u_int64_t * C, const size_t n, const char * logcat)
+void validate_counter_bits(const size_t thd_id, const u_int64_t * C, const size_t n, const char * logcat)
 {
 	u_int64_t LC[16];
 
 	pi_rho_mu((const unsigned char *)C, (unsigned char *)LC);
 
-	u_int64_t bit_3_1_41 = (0 == (RC2I(LC,3,1) & (0x1UL << 41)))? 0: 1;
-	u_int64_t bit_3_3_41 = (0 == (RC2I(LC,3,3) & (0x1UL << 41)))? 0: 1;
+	u_int64_t mask_41_id = left_rotate(0x1, 41 + thd_id);
 
-	if(n != ((bit_3_1_41 << 1) | bit_3_3_41))
+	u_int64_t bit_3_1_41_id = (0 == (RC2I(LC,3,1) & mask_41_id))? 0: 1;
+	u_int64_t bit_3_3_41_id = (0 == (RC2I(LC,3,3) & mask_41_id))? 0: 1;
+
+	if(n != ((bit_3_1_41_id << 1) | bit_3_3_41_id))
 	{
-		log4cpp::Category::getInstance(logcat).fatal("%s: counter bits mismatch; n = %lu; bit_3_1_41 = %lu; bit_3_3_41 = %lu;",
-				__FUNCTION__, n, bit_3_1_41, bit_3_3_41);
+		log4cpp::Category::getInstance(logcat).fatal("%s: counter bits mismatch; n = %lu; bit_3_1_41_id = %lu; bit_3_3_41_id = %lu;",
+				__FUNCTION__, n, bit_3_1_41_id, bit_3_3_41_id);
 		log_block("C", C, logcat, 0);
 		log_block("LC", LC, logcat, 0);
 		exit(-1);
@@ -309,8 +311,8 @@ void validate_counter_bits(const u_int64_t * C, const size_t n, const char * log
 		log4cpp::Category::getInstance(logcat).debug("%s: LC[3][3][41] = 0x%016lX & 0x%016lX = 0x%016lX",
 				__FUNCTION__, RC2I(LC,3,3), (0x1UL << 41), (RC2I(LC,3,3) & (0x1UL << 41)));
 
-		log4cpp::Category::getInstance(logcat).debug("%s: counter bits match; n = %lu; bit_3_1_41 = %lu; bit_3_3_41 = %lu;",
-				__FUNCTION__, n, bit_3_1_41, bit_3_3_41);
+		log4cpp::Category::getInstance(logcat).debug("%s: counter bits match; n = %lu; bit_3_1_41_id = %lu; bit_3_3_41_id = %lu;",
+				__FUNCTION__, n, bit_3_1_41_id, bit_3_3_41_id);
 	}
 
 	log4cpp::Category::getInstance(logcat).info("%s: counter bits check out.", __FUNCTION__);
