@@ -121,8 +121,8 @@ void cryptanalysis()
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
 
-	//if(0 != attack_u03(logcat, key, iv, U[0], U[3]))
-	if(0 != attack_u03_bit0_test0(logcat))
+	if(0 != attack_u03(logcat, key, iv, U[0], U[3]))
+	//if(0 != attack_u03_bit0_test0(logcat))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03_bit0_test() failure.", __FUNCTION__);
 		return;
