@@ -1023,7 +1023,7 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 	size_t guessed_bit_offset = 31 + thd_id;
 	u_int64_t guessed_bit = v[0]^1, actual_bit = (U3 & left_rotate(0x1, guessed_bit_offset))? 1: 0;
 
-	log4cpp::Category::getInstance(logcat).notice("%s: guessued U3 bit %lu = %lu; actual U3 bit %lu = %lu; U3 %s.",
+	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 bit %lu = %lu; actual U3 bit %lu = %lu; U3 %s.",
 				__FUNCTION__, guessed_bit_offset, guessed_bit, guessed_bit_offset, actual_bit, ((guessed_bit == actual_bit)? "success": "failure"));
 
 	guessed_bit_offset = 49 + thd_id;
