@@ -51,7 +51,7 @@ void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * i
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = pow(2, 22);//16029384739;
+const u_int64_t u03_ceiling_pow_2_33p9 = (u_int64_t)pow(2, 33.9) + 1;
 
 typedef struct
 {
@@ -121,7 +121,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								memcpy(atckr_prms[i].init_block, init_block, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
-								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker_hack, (void *)(atckr_prms.data() + i))))
+								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
 									log4cpp::Category::getInstance(locat).error("%s: pthread_create() failed with error %d : [%s]",

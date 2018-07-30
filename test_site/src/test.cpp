@@ -1,6 +1,7 @@
 
 #include <stdlib.h>
 #include <memory.h>
+#include <math.h>
 
 #include <iostream>
 #include <sstream>
@@ -19,7 +20,8 @@ void test();
 int main() {
 	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
 
-	test();
+	u_int64_t u03_ceiling_pow_2_33p9 = (u_int64_t)pow(2, 33.9) + 1;
+	cout << u03_ceiling_pow_2_33p9 << endl;
 
 	return 0;
 }
