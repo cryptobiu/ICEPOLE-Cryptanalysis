@@ -50,18 +50,18 @@ void log_state(const char * label, const u_int64_t state[4][5], const char * log
 	log4cpp::Category::getInstance(logcat).log(level, "%s:\n%s", label, str.c_str());
 }
 
-void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64_t init_block[4][5], const char * logcat)
+void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64_t init_state[4][5], const char * logcat)
 {
 	for(int i = 0; i < 4; ++i)
 	{
 		for(int j = 0; j < 4; ++j)
 		{
-			if( ( RC2I(P,i,j) ^ RC2I(C,i,j) ) != init_block[i][j])
+			if( ( RC2I(P,i,j) ^ RC2I(C,i,j) ) != init_state[i][j])
 			{
 				log4cpp::Category::getInstance(logcat).fatal("%s: P^C[%d:%d] = %016lX; IB[i][i] = %016lX; mismatch.",
-						__FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_block[i][j]);
+						__FUNCTION__, i, j, ( RC2I(P,i,j) ^ RC2I(C,i,j) ), init_state[i][j]);
 				log_block("P", P, logcat, 0);
-				log_state("IS", init_block, logcat, 0);
+				log_state("IS", init_state, logcat, 0);
 				exit(-1);
 			}
 		}
@@ -149,7 +149,7 @@ void validate_generated_input_1(const size_t thd_id, const u_int64_t * P, const 
 	{
 		for(int j = 0; j < 4; ++j)
 		{
-			RC2I(PxorIS, i, j) = RC2I(P, i, j) ^ left_rotate(init_state[i][j], thd_id);
+			RC2I(PxorIS, i, j) = RC2I(P, i, j) ^ init_state[i][j];
 		}
 	}
 
