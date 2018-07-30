@@ -134,9 +134,9 @@ int crypto_aead_decrypt(
 int kappa5(unsigned char * p)
 {
 	ICESTATE Ss, Sk;
-	memcpy(Ss, p, sizeof(u_int64_t));
+	Ss[0][0] = *((u_int64_t *)p);
 	Kappa(Sk, Ss, 5);
-	memcpy(p, Sk, sizeof(u_int64_t));
+	*((u_int64_t *)p) = Sk[0][0];
 	return 0;
 }
 

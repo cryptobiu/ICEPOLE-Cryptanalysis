@@ -577,9 +577,7 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 
 u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z)
 {
-	size_t _z = z%64;
-	if(P[x + 4 * y] & (0x1 << _z)) return 1;
-	return 0;
+	return (0 != (P[x + 4 * y] & (0x1UL << (z%64))))? 1: 0;
 }
 
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z)
@@ -1035,9 +1033,106 @@ void guess(const char * logcat, const size_t ctr_1[4], const size_t ctr_2[4], co
 		log4cpp::Category::getInstance(logcat).notice("%s: (U0 bit %lu ^ U3 bit %lu) != v[1]; U0 failure.", __FUNCTION__, guessed_bit_offset, guessed_bit_offset);
 }
 
-static const size_t keys = 1, attacks = pow(2,22);
+void attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
+				  const u_int64_t init_state[4][5], aes_prg & prg, const size_t thd_id)
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
+	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+	u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
 
-int attack_u03_bit0_test0(const char * logcat)
+	u_int64_t x_state[4][5];
+	u_int8_t hF1 = 0, hF2 = 0, tF1 = 0, tF2 = 0;
+
+	generate_inputs(thd_id, P1, P2, prg, init_state, logcat);
+
+	validate_generated_input_1(thd_id, P1, init_state, logcat);
+	validate_generated_input_2(thd_id, P1, P2, logcat);
+
+	log_block("P1-0", P1, logcat, 700);
+	log_block("P1-1", P1+BLONG_SIZE, logcat, 700);
+	log_block("P2-0", P2, logcat, 700);
+	log_block("P2-1", P2+BLONG_SIZE, logcat, 700);
+
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+
+	validate_init_state(P1, C1, init_state, logcat);
+
+	log_block("C1-0", C1, logcat, 700);
+	log_block("C1-1", C1+BLONG_SIZE, logcat, 700);
+	log_state("x-state-1", x_state, logcat, 700);
+
+	hF1 = xor_state_bits(x_state, thd_id);
+	validate_state_bits(thd_id, x_state, hF1, logcat);
+	log4cpp::Category::getInstance(logcat).debug("%s: x-state-1 XOR of designated bits = %hhu.", __FUNCTION__, hF1);
+
+	get_permutation_output(P1, C1, P1_perm_output);
+	kappa5((unsigned char *)P1_perm_output);
+
+	if(last_Sbox_lookup_filter(P1_perm_output, thd_id, tF1, logcat))
+	{
+		log4cpp::Category::getInstance(logcat).log(((hF1 == tF1)? 500: 300), "%s: tF1 = %hhu %s= %hhu = hF1.",
+				__FUNCTION__, tF1, ((hF1 == tF1)? "": "!"), hF1);
+		if(hF1 != tF1)
+		{
+			log_block("P1-0", P1, logcat, 300);
+			log_block("P1-1", P1+BLONG_SIZE, logcat, 300);
+			log_block("C1-0", C1, logcat, 300);
+			log_block("C1-1", C1+BLONG_SIZE, logcat, 300);
+			log_state("x-state-1", x_state, logcat, 300);
+			log_block("P1_perm-kappa", P1_perm_output, logcat, 300);
+		}
+	}
+	else
+	{
+		log4cpp::Category::getInstance(logcat).warn("%s: last_Sbox_lookup_filter() for P1 failed.", __FUNCTION__);
+	}
+
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C2, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+
+	validate_init_state(P2, C2, init_state, logcat);
+
+	log_block("C2-0", C2, logcat, 700);
+	log_block("C2-1", C2+BLONG_SIZE, logcat, 700);
+	log_state("x-state-2", x_state, logcat, 700);
+
+	hF2 = xor_state_bits(x_state, thd_id);
+	validate_state_bits(thd_id, x_state, hF2, logcat);
+	log4cpp::Category::getInstance(logcat).debug("%s: x-state-2 XOR of designated bits = %hhu.", __FUNCTION__, hF2);
+
+	get_permutation_output(P2, C2, P2_perm_output);
+	kappa5((unsigned char *)P2_perm_output);
+
+	if(last_Sbox_lookup_filter(P2_perm_output, thd_id, tF2, logcat))
+	{
+		log4cpp::Category::getInstance(logcat).log(((hF2 == tF2)? 500: 300), "%s: tF2 = %hhu %s= %hhu = hF2.",
+				__FUNCTION__, tF2, ((hF2 == tF2)? "": "!"), hF2);
+		if(hF2 != tF2)
+		{
+			log_block("P2-0", P2, logcat, 300);
+			log_block("P2-1", P2+BLONG_SIZE, logcat, 300);
+			log_block("C2-0", C2, logcat, 300);
+			log_block("C2-1", C2+BLONG_SIZE, logcat, 300);
+			log_state("x-state-2", x_state, logcat, 300);
+			log_block("P2_perm-kappa", P2_perm_output, logcat, 300);
+		}
+	}
+	else
+	{
+		log4cpp::Category::getInstance(logcat).warn("%s: last_Sbox_lookup_filter() for P1 failed.", __FUNCTION__);
+	}
+
+	if((hF1 == tF1) && (hF2 == tF2))
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: bingo!!!.", __FUNCTION__);
+	}
+}
+
+static const size_t keys = 1, attacks = 10000; //pow(2,22);
+
+int attack_u03_test20(const char * logcat)
 {
 	aes_prg prg;
 	if(0 != prg.init(BLOCK_SIZE))
@@ -1048,7 +1143,7 @@ int attack_u03_bit0_test0(const char * logcat)
 
 	u_int8_t key[KEY_SIZE], iv[KEY_SIZE];
 
-	log4cpp::Category::getInstance(logcat).notice("%s: testing %lu keys against %lu attacks:", __FUNCTION__, keys, attacks);
+	log4cpp::Category::getInstance(logcat).notice("%s: testing %lu keys against %lu attack checks:", __FUNCTION__, keys, attacks);
 
 	for(int i = 0; i < keys; ++i)
 	{
@@ -1062,7 +1157,7 @@ int attack_u03_bit0_test0(const char * logcat)
 		get_init_block(init_state, key, iv);
 		log_state("init_state", init_state, logcat, 700);
 
-		for(size_t id = 0; id < 64; ++id)
+		for(size_t id = 0; id < 1; ++id)
 		{
 			log4cpp::Category::getInstance(logcat).notice("%s: attack on bit at offset %lu.\n****************************************************************************************************************************************************\n", __FUNCTION__, id);
 			size_t ctr_1[4], ctr_2[4];
@@ -1071,15 +1166,10 @@ int attack_u03_bit0_test0(const char * logcat)
 
 			for(size_t j = 0; j < attacks; ++j)
 			{
-				log4cpp::Category::getInstance(logcat).debug("%s: running attack %lu.\n----------------------------------------------------------------------------------------------------------------------------------------------------\n", __FUNCTION__, j);
-				attack_key(logcat, key, iv, init_state, prg, ctr_1, ctr_2, id);
+				log4cpp::Category::getInstance(logcat).debug("%s: running attack check %lu.\n----------------------------------------------------------------------------------------------------------------------------------------------------\n", __FUNCTION__, j);
+				attack_check(logcat, key, iv, init_state, prg, id);
 				log4cpp::Category::getInstance(logcat).debug("\n----------------------------------------------------------------------------------------------------------------------------------------------------\n", __FUNCTION__, j);
 			}
-
-			for(size_t j = 0; j < 4; ++j)
-				log4cpp::Category::getInstance(logcat).notice("%s: ctr_1[%lu] = %lu; ctr_2[%lu] = %lu.", __FUNCTION__, j, ctr_1[j], j, ctr_2[j]);
-
-			guess(logcat, ctr_1, ctr_2, init_state[0][4], init_state[3][4], id);
 		}
 
 	}
