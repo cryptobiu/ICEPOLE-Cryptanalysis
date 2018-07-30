@@ -73,7 +73,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	u_int64_t init_block[4][5];
 	get_init_block(init_block, key, iv);
 
-	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, init_block[3][0], init_block[3][4]);
+	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, init_block[0][4], init_block[3][4]);
 
 	sem_t run_flag;
 	if(0 == sem_init(&run_flag, 0, 1))

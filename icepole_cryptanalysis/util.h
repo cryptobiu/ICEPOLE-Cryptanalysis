@@ -7,4 +7,8 @@
 
 #define RC2I(arr,x,y) arr[x + 4*y]
 
+void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat, const int level);
+void log_block(const char * label, const u_int64_t * block, const char * logcat, const int level);
+void log_state(const char * label, const u_int64_t state[4][5], const char * logcat, const int level);
+
 u_int64_t left_rotate(u_int64_t v, size_t r);

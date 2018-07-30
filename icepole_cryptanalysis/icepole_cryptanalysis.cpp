@@ -115,8 +115,19 @@ void init_log(const char * a_log_file, const char * a_log_dir, const int log_lev
 
 void cryptanalysis()
 {
-	static const u_int8_t key[KEY_SIZE] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
-	static const u_int8_t iv[KEY_SIZE] = { 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
+	u_int8_t key[KEY_SIZE], iv[KEY_SIZE];
+	{
+		aes_prg prg;
+		if(0 != prg.init(BLOCK_SIZE))
+		{
+			log4cpp::Category::getInstance(logcat).error("%s: prg.init() failure", __FUNCTION__);
+			return;
+		}
+		prg.gen_rand_bytes(key, KEY_SIZE);
+		log_buffer("Selected key", key, KEY_SIZE, logcat, 700);
+		prg.gen_rand_bytes(iv, KEY_SIZE);
+		log_buffer("Selected iv ", iv, KEY_SIZE, logcat, 700);
+	}
 
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
