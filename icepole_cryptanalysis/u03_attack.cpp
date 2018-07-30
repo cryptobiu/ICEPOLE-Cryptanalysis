@@ -1042,7 +1042,7 @@ void attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int
 	u_int64_t P1_perm_output[BLONG_SIZE], P2_perm_output[BLONG_SIZE];
 
 	u_int64_t x_state[4][5];
-	u_int8_t hF1 = 0, hF2 = 0, tF1 = 0, tF2 = 0;
+	u_int8_t hF1 = 0, hF2 = 0, tF1 = 0, tF2 = 0, nCount = 0;
 
 	generate_inputs(thd_id, P1, P2, prg, init_state, logcat);
 
@@ -1083,6 +1083,8 @@ void attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int
 			log_state("x-state-1", x_state, logcat, 300);
 			log_block("P1_perm-kappa", P1_perm_output, logcat, 300);
 		}
+		else
+			nCount++;
 	}
 	else
 	{
@@ -1118,13 +1120,15 @@ void attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int
 			log_state("x-state-2", x_state, logcat, 300);
 			log_block("P2_perm-kappa", P2_perm_output, logcat, 300);
 		}
+		else
+			nCount++;
 	}
 	else
 	{
 		log4cpp::Category::getInstance(logcat).warn("%s: last_Sbox_lookup_filter() for P1 failed.", __FUNCTION__);
 	}
 
-	if((hF1 == tF1) && (hF2 == tF2))
+	if(nCount == 2 && (hF1 == tF1) && (hF2 == tF2))
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: bingo!!!.", __FUNCTION__);
 	}
