@@ -336,11 +336,9 @@ void * u03_attacker(void * arg)
 				if(F1 == F2)
 					prm->ctr_2[n]++;
 
-				if((++samples_done)%50000 == 0)
-				{
-					log4cpp::Category::getInstance(prm->locat).notice("%s: %lu samples done.",
-							__FUNCTION__, samples_done);
-				}
+				++samples_done;
+				log4cpp::Category::getInstance(prm->locat).notice("%s: %lu samples done.",
+											__FUNCTION__, samples_done);
 			}
 		}
 
