@@ -25,7 +25,7 @@ typedef struct
 	size_t id;
 	std::string locat;
 	sem_t * run_flag;
-	u_int64_t * samples_done;
+	bool attack_done;
 	u_int8_t * key, * iv;
 	u_int64_t init_block[4][5];
 	u_int64_t ctr_1[4], ctr_2[4];
@@ -57,7 +57,7 @@ typedef struct
 {
 	struct event_base * the_base;
 	std::string locat;
-	u_int64_t * samples_done;
+	std::vector<u03_attacker_t> * atckr_prms;
 }event_param_t;
 
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3)
@@ -67,11 +67,10 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	char locat[32];
 	snprintf(locat, 32, "%s.u03", logcat);
 
-	u_int64_t * samples_done = new u_int64_t[u03_thread_count];
-	memset(samples_done, 0, u03_thread_count * sizeof(u_int64_t));
-
 	u_int64_t init_block[4][5];
 	get_init_block(init_block, key, iv);
+
+	std::vector<u03_attacker_t> atckr_prms(u03_thread_count);
 
 	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, init_block[0][4], init_block[3][4]);
 
@@ -86,7 +85,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 			event_param_t eprm;
 			eprm.the_base = the_base;
 			eprm.locat = locat;
-			eprm.samples_done = samples_done;
+			eprm.atckr_prms = &atckr_prms;
 
 			struct event * sigint_evt = evsignal_new(the_base, 2/*=SIGINT*/, sigint_cb, &eprm);
 			if(NULL != sigint_evt)
@@ -109,13 +108,13 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 
 							int errcode;
 							std::vector<pthread_t> atckr_thds(u03_thread_count);
-							std::vector<u03_attacker_t> atckr_prms(u03_thread_count);
+
 							for(size_t i = 0; i < u03_thread_count; ++i)
 							{
 								atckr_prms[i].id = i;
 								atckr_prms[i].locat = locat;
 								atckr_prms[i].run_flag = &run_flag;
-								atckr_prms[i].samples_done = samples_done + i;
+								atckr_prms[i].attack_done = false;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
 								memcpy(atckr_prms[i].init_block, init_block, 4*5*sizeof(u_int64_t));
@@ -229,7 +228,6 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 		log4cpp::Category::getInstance(locat).error("%s: sem_init() failed with error %d : [%s]",
 				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
 	}
-	delete []samples_done;
 	return result;
 }
 
@@ -242,16 +240,14 @@ void sigint_cb(evutil_socket_t, short, void * arg)
 
 void timer_cb(evutil_socket_t, short, void * arg)
 {
-	bool all_samples_done = true;
+	bool all_attacks_done = true;
 	event_param_t * eprm = (event_param_t *)arg;
 	for(size_t i = 0; i < u03_thread_count; ++i)
 	{
-		u_int64_t samples_done = __sync_add_and_fetch(eprm->samples_done + i, 0);
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: thread %lu smaples done = %lu.", __FUNCTION__, i, samples_done);
-		all_samples_done = all_samples_done && (samples_done >= u03_ceiling_pow_2_33p9);
+		all_attacks_done = all_attacks_done && (*eprm->atckr_prms)[i].attack_done;
 	}
 
-	if(all_samples_done)
+	if(all_attacks_done)
 	{
 		log4cpp::Category::getInstance(eprm->locat).notice("%s: all samples are done for all threads; breaking event loop.", __FUNCTION__);
 		event_base_loopbreak(eprm->the_base);
@@ -287,13 +283,10 @@ void * u03_attacker(void * arg)
 	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
 
-	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
-	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
+	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
+	while(0 != run_flag_value && samples_done < required_samples)
 	{
 		generate_inputs(prm->id, P1, P2, prg, prm->init_block, prm->locat.c_str());
-
-		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
-		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
 
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt((unsigned char *)C1, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key);
@@ -343,9 +336,11 @@ void * u03_attacker(void * arg)
 				if(F1 == F2)
 					prm->ctr_2[n]++;
 
-				/*
-				 * 	!!! For all of the above: apply shift-left by ID for everything !!!
-				 */
+				if((++samples_done)%50000 == 0)
+				{
+					log4cpp::Category::getInstance(prm->locat).notice("%s: %lu samples done.",
+							__FUNCTION__, samples_done);
+				}
 			}
 		}
 
@@ -358,6 +353,8 @@ void * u03_attacker(void * arg)
 			exit(__LINE__);
 		}
 	}
+
+	prm->attack_done = true;
 
 	/*
 	 * 	Once the above is done for 2^33.9 samples, check for which counter pair the deviation from 0.5 is greatest:
@@ -381,8 +378,8 @@ int generate_inputs(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P2[
 	generate_input_p1(thd_id, P1, prg, init_state, logcat);
 	generate_input_p2(thd_id, P1, P2, logcat);
 
-	log_block("P1shft", P1, logcat, 700);
-	log_block("P2shft", P2, logcat, 700);
+	log_block("P1", P1, logcat, 700);
+	log_block("P2", P2, logcat, 700);
 	return 0;
 }
 
@@ -796,91 +793,6 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 	}
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U0);
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
-}
-
-
-/*
- * 3. Implement an encrypt version that saves the icepole state from inside P6, from round4 + Mu, Rho & Pi.
- * (that's P6 minus the last Kappa and Psi).
- *
- * 4. The saved state from 3 is the original 'looked up' state. So now F1 and F2 can be calculated
- * directly. Use the __row_t for mask, and calculate F1 and F2 without filtering.
- *
- * 5. last_Sbox_lookup_filter is not needed. Update the counters accordingly.
- *
- * 6. Perform 2^22 tests and compare.
- *
- */
-
-void * u03_attacker_hack(void * arg)
-{
-	u03_attacker_t * prm = (u03_attacker_t *)arg;
-
-	char atckr_locat[32];
-	snprintf(atckr_locat, 32, "%s.%lu", prm->locat.c_str(), prm->id);
-	prm->locat = atckr_locat;
-
-	aes_prg prg;
-	if(0 != prg.init(BLOCK_SIZE))
-	{
-		log4cpp::Category::getInstance(prm->locat).error("%s: prg.init() failure", __FUNCTION__);
-		return NULL;
-	}
-
-	int run_flag_value;
-	if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
-	{
-		int errcode = errno;
-		char errmsg[256];
-		log4cpp::Category::getInstance(prm->locat).error("%s: sem_getvalue() failed with error %d : [%s]",
-				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
-		exit(__LINE__);
-	}
-
-	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE];
-	u_int64_t C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
-	unsigned long long clen;
-	u_int64_t x_state[4][5];
-	u_int8_t F1 = 0, F2 = 0;
-
-	size_t samples_done = __sync_add_and_fetch(prm->samples_done, 0);
-	while(0 != run_flag_value && samples_done < u03_ceiling_pow_2_33p9)
-	{
-		generate_inputs(prm->id, P1, P2, prg, prm->init_block, prm->locat.c_str());
-
-		//each generated input counts for the 'u03_ceiling_pow_2_33p9'
-		samples_done = __sync_add_and_fetch(prm->samples_done, 1);
-
-		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
-		crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state);
-		F1 = xor_state_bits(x_state, prm->id);
-
-		size_t n = lookup_counter_bits(prm->id, C);
-
-		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
-		crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, prm->iv, prm->key, x_state);
-		F2 = xor_state_bits(x_state, prm->id);
-
-		/* 	Increment counter-1 [ [3][1][41] , [3][3][41] ]. */
-		prm->ctr_1[n]++;
-
-		/* If the calculated XOR F1/F2 is equal for P1/P2 increment counter-2 [ [3][1][41] , [3][3][41] ]. */
-		if(F1 == F2)
-			prm->ctr_2[n]++;
-
-		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
-		{
-			int errcode = errno;
-			char errmsg[256];
-			log4cpp::Category::getInstance(prm->locat).error("%s: sem_getvalue() failed with error %d : [%s]",
-					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
-			exit(__LINE__);
-		}
-	}
-
-	log4cpp::Category::getInstance(prm->locat).debug("%s: exit.", __FUNCTION__);
-
-	return NULL;
 }
 
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv)
