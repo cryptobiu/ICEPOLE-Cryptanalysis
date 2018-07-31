@@ -49,10 +49,9 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C);
-/*
 int u03_bit_attack(const size_t bit_offset,
 				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);*/
+				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
 int u03_bit_attack_check(const size_t bit_offset,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 						 aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
@@ -270,30 +269,28 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	return result;
 }
 
-/*
 int u03_bit_attack(const size_t bit_offset,
 				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4])
 {
-	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], Perm_output[BLONG_SIZE];
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
 	u_int8_t F1 = 0, F2 = 0;
+	u_int64_t x_state[4][5];
 
 	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
-	get_permutation_output(P1, C, Perm_output);
-	kappa5((unsigned char *)Perm_output);
+	kappa5((unsigned char *)(C+BLONG_SIZE));
 
-	if(last_Sbox_lookup_filter(Perm_output, bit_offset, F1, logcat))
+	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
 	{
 		size_t n = lookup_counter_bits(bit_offset, C);
 		generate_input_p2(bit_offset, P1, P2, logcat);
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
-		get_permutation_output(P2, C, Perm_output);
-		kappa5((unsigned char *)Perm_output);
-		if(last_Sbox_lookup_filter(Perm_output, bit_offset, F2, logcat))
+		kappa5((unsigned char *)(C+BLONG_SIZE));
+		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
 		{
 			ctr_1[n]++;
 			if(F1 == F2)
@@ -301,7 +298,7 @@ int u03_bit_attack(const size_t bit_offset,
 		}
 	}
 	return 0;
-}*/
+}
 
 int u03_bit_attack_check(const size_t bit_offset,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
@@ -806,7 +803,7 @@ void * u03_attacker(void * arg)
 	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
 	while(0 != run_flag_value && samples_done < required_samples)
 	{
-		u03_bit_attack_check(prm->id, prm->key, prm->iv, prm->init_state, prg, prm->logcat.c_str(), prm->ctr_1, prm->ctr_2);
+		u03_bit_attack(prm->id, prm->key, prm->iv, prm->init_state, prg, prm->logcat.c_str(), prm->ctr_1, prm->ctr_2);
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
