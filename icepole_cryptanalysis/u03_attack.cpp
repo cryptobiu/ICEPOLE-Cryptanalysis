@@ -51,8 +51,6 @@ void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * i
 
 const size_t u03_thread_count = 64;
 
-const u_int64_t u03_ceiling_pow_2_33p9 = (u_int64_t)pow(2, 33.9) + 1;
-
 typedef struct
 {
 	struct event_base * the_base;
