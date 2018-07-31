@@ -648,7 +648,6 @@ int generate_input_p2(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P
 	RC2I(P2,2,3) ^= left_rotate(0x1, thd_id);
 	RC2I(P2,3,0) ^= left_rotate(0x1, thd_id);
 	RC2I(P2,3,2) ^= left_rotate(0x1, thd_id);
-	log_block("P2fix", P2, logcat, 700);
 	return 0;
 }
 
