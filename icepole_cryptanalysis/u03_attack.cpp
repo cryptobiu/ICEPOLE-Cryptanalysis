@@ -273,23 +273,25 @@ int u03_bit_attack(const size_t bit_offset,
 				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4])
 {
-	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], Perm_output[BLONG_SIZE];
 	unsigned long long clen;
 	u_int8_t F1 = 0, F2 = 0;
 
 	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
-	kappa5((unsigned char *)(C+BLONG_SIZE));
+	get_permutation_output(P1, C, Perm_output);
+	kappa5((unsigned char *)Perm_output);
 
-	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
+	if(last_Sbox_lookup_filter(Perm_output, bit_offset, F1, logcat))
 	{
 		size_t n = lookup_counter_bits(bit_offset, C);
 		generate_input_p2(bit_offset, P1, P2, logcat);
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
-		kappa5((unsigned char *)(C+BLONG_SIZE));
-		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
+		get_permutation_output(P2, C, Perm_output);
+		kappa5((unsigned char *)Perm_output);
+		if(last_Sbox_lookup_filter(Perm_output, bit_offset, F2, logcat))
 		{
 			ctr_1[n]++;
 			if(F1 == F2)
@@ -303,7 +305,7 @@ int u03_bit_attack_check(const size_t bit_offset,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 						 aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4])
 {
-	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], Perm_output[BLONG_SIZE];
 	unsigned long long clen;
 	u_int8_t F1 = 0, F2 = 0;
 	u_int64_t x_state[4][5];
@@ -322,6 +324,10 @@ int u03_bit_attack_check(const size_t bit_offset,
 		kappa5((unsigned char *)(C+BLONG_SIZE));
 		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
 		{
+			ctr_1[n]++;
+			if(F1 == F2)
+				ctr_2[n]++;
+
 			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
 			u_int8_t hF1 = xor_state_bits(x_state, bit_offset);
