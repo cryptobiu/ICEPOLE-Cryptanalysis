@@ -21,7 +21,7 @@
 #include "u03_attack_validation.h"
 
 const size_t u03_thread_count = 64;
-const time_t allotted_time = 1200;
+const time_t allotted_time = 2/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
 
 typedef struct
 {
