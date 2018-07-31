@@ -115,6 +115,7 @@ void init_log(const char * a_log_file, const char * a_log_dir, const int log_lev
 
 void cryptanalysis()
 {
+	/*
 	u_int8_t key[KEY_SIZE], iv[KEY_SIZE];
 	{
 		aes_prg prg;
@@ -137,13 +138,14 @@ void cryptanalysis()
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
 		return;
 	}
+	*/
 
-	/*
-	if(0 != attack_u03(logcat, key, iv, U[0], U[3]))
+	/**/
+	if(0 != attack_u03_test20(logcat))
 	{
-		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
+		log4cpp::Category::getInstance(logcat).error("%s: attack_u03_test20() failure.", __FUNCTION__);
 		return;
-	}*/
+	}
 
 	/*
 	if(0 != attack_u2(key, iv, U[2]))
@@ -159,7 +161,9 @@ void cryptanalysis()
 		return;
 	}*/
 
+	/*
 	log4cpp::Category::getInstance(logcat).notice("%s: attack done; U0=0x%016lX; U1=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
 													__FUNCTION__, U[0], U[1], U[2], U[3]);
+													*/
 }
 
