@@ -52,9 +52,13 @@ size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C);
 int u03_bit_attack(const size_t bit_offset,
 				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
+int u03_bit_attack_check(const size_t bit_offset,
+				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+						 aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
 void * u03_attacker(void *);
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
 
 void sigint_cb(evutil_socket_t, short, void * arg)
 {
@@ -269,29 +273,83 @@ int u03_bit_attack(const size_t bit_offset,
 				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4])
 {
-	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE], Perm_output[BLONG_SIZE];
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
 	u_int8_t F1 = 0, F2 = 0;
 
 	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
-	get_permutation_output(P1, C, Perm_output);
-	kappa5((unsigned char *)Perm_output);
+	kappa5((unsigned char *)(C+BLONG_SIZE));
 
-	if(last_Sbox_lookup_filter(Perm_output, bit_offset, F1, logcat))
+	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
 	{
 		size_t n = lookup_counter_bits(bit_offset, C);
 		generate_input_p2(bit_offset, P1, P2, logcat);
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
-		get_permutation_output(P2, C, Perm_output);
-		kappa5((unsigned char *)Perm_output);
-		if(last_Sbox_lookup_filter(Perm_output, bit_offset, F2, logcat))
+		kappa5((unsigned char *)(C+BLONG_SIZE));
+		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
 		{
 			ctr_1[n]++;
 			if(F1 == F2)
 				ctr_2[n]++;
+		}
+	}
+	return 0;
+}
+
+int u03_bit_attack_check(const size_t bit_offset,
+				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+						 aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4])
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+	u_int8_t F1 = 0, F2 = 0;
+	u_int64_t x_state[4][5];
+
+	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
+	kappa5((unsigned char *)(C+BLONG_SIZE));
+
+	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
+	{
+		size_t n = lookup_counter_bits(bit_offset, C);
+		generate_input_p2(bit_offset, P1, P2, logcat);
+		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
+		kappa5((unsigned char *)(C+BLONG_SIZE));
+		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
+		{
+			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+			u_int8_t hF1 = xor_state_bits(x_state, bit_offset);
+
+			if(hF1 != F1)
+			{
+				log4cpp::Category::getInstance(logcat).fatal("%s: hF1 = %hhu != %hhu = F1!", __FUNCTION__, hF1, F1);
+				log_buffer("key", key, KEY_SIZE, logcat, 0);
+				log_buffer("iv ", iv, KEY_SIZE, logcat, 0);
+				log_state("x_state", x_state, logcat, 0);
+				log_block("P1", P1, logcat, 0);
+				exit(-1);
+			}
+
+			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+			u_int8_t hF2 = xor_state_bits(x_state, bit_offset);
+
+			if(hF2 != F2)
+			{
+				log4cpp::Category::getInstance(logcat).fatal("%s: hF2 = %hhu != %hhu = F2!", __FUNCTION__, hF2, F2);
+				log_buffer("key", key, KEY_SIZE, logcat, 0);
+				log_buffer("iv ", iv, KEY_SIZE, logcat, 0);
+				log_state("x_state", x_state, logcat, 0);
+				log_block("P1", P1, logcat, 0);
+				log_block("P2", P1, logcat, 0);
+				exit(-1);
+			}
 		}
 	}
 	return 0;
@@ -740,7 +798,8 @@ void * u03_attacker(void * arg)
 	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
 	while(0 != run_flag_value && samples_done < required_samples)
 	{
-		u03_bit_attack(prm->id, prm->key, prm->iv, prm->init_state, prg, prm->logcat.c_str(), prm->ctr_1, prm->ctr_2);
+		//u03_bit_attack(prm->id, prm->key, prm->iv, prm->init_state, prg, prm->logcat.c_str(), prm->ctr_1, prm->ctr_2);
+		u03_bit_attack_check(prm->id, prm->key, prm->iv, prm->init_state, prg, prm->logcat.c_str(), prm->ctr_1, prm->ctr_2);
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
@@ -755,4 +814,18 @@ void * u03_attacker(void * arg)
 	prm->attack_done = true;
 	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
 	return NULL;
+}
+
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset)
+{
+	static const struct __bit_t { size_t x; size_t y; size_t z; } bits[8] = { {0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
+																			  {2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
+	u_int8_t result = 0;
+	for(size_t i = 0; i < 8; ++i)
+	{
+		u_int64_t integer = state[bits[i].x][bits[i].y];
+		u_int64_t mask = left_rotate(0x1, bits[i].z + bit_offset);
+		result ^= ((integer & mask)? 1: 0);
+	}
+	return result;
 }
