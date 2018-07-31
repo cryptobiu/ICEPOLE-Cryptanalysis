@@ -376,8 +376,8 @@ int generate_inputs(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P2[
 	generate_input_p1(thd_id, P1, prg, init_state, logcat);
 	generate_input_p2(thd_id, P1, P2, logcat);
 
-	log_block("P1", P1, logcat, 700);
-	log_block("P2", P2, logcat, 700);
+	//log_block("P1", P1, logcat, 700);
+	//log_block("P2", P2, logcat, 700);
 	return 0;
 }
 
