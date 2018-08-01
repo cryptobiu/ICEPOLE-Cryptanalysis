@@ -32,6 +32,8 @@ typedef struct
 
 }attacker_t;
 
+void * attacker(void * arg);
+
 typedef struct
 {
 	struct event_base * the_base;

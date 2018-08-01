@@ -62,7 +62,6 @@ void timer_cb(evutil_socket_t, short, void * arg)
 	}
 }
 
-void * attacker(void * arg);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, const char * logcat);
 
 int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U2, const u_int64_t & U0, const u_int64_t & U3)
@@ -242,51 +241,6 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, cons
 			U2 |= left_rotate(0x1, 27 + j);
 		}
 	}
-}
-
-void * attacker(void * arg)
-{
-	attacker_t * prm = (attacker_t *)arg;
-
-	char atckr_locat[32];
-	snprintf(atckr_locat, 32, "%s.%lu", prm->logcat.c_str(), prm->id);
-	prm->logcat = atckr_locat;
-
-	aes_prg prg;
-	if(0 != prg.init(BLOCK_SIZE))
-	{
-		log4cpp::Category::getInstance(prm->logcat).error("%s: prg.init() failure", __FUNCTION__);
-		return NULL;
-	}
-
-	int run_flag_value;
-	if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
-	{
-		int errcode = errno;
-		char errmsg[256];
-		log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
-				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
-		exit(__LINE__);
-	}
-
-	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
-	while(0 != run_flag_value && samples_done < required_samples)
-	{
-		(*prm->bit_attack)(prm->id, prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctr_1, prm->ctr_2);
-
-		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
-		{
-			int errcode = errno;
-			char errmsg[256];
-			log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
-					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
-			exit(__LINE__);
-		}
-	}
-
-	prm->attack_done = true;
-	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
-	return NULL;
 }
 
 }

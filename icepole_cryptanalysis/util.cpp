@@ -2,12 +2,16 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <semaphore.h>
+#include <math.h>
+
 #include <sstream>
 #include <iomanip>
 
+#include <openssl/evp.h>
 #include <log4cpp/Category.hh>
 
 #include "util.h"
+#include "aes_prg.h"
 #include "icepole128av2/ref/encrypt.h"
 
 void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat, const int level)
@@ -78,5 +82,50 @@ void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * i
 	memset(is, 0, 20*sizeof(u_int64_t));
 
 	crypto_aead_encrypt_i((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key, ib);
+}
+
+void * attacker(void * arg)
+{
+	attacker_t * prm = (attacker_t *)arg;
+
+	char atckr_locat[32];
+	snprintf(atckr_locat, 32, "%s.%lu", prm->logcat.c_str(), prm->id);
+	prm->logcat = atckr_locat;
+
+	aes_prg prg;
+	if(0 != prg.init(BLOCK_SIZE))
+	{
+		log4cpp::Category::getInstance(prm->logcat).error("%s: prg.init() failure", __FUNCTION__);
+		return NULL;
+	}
+
+	int run_flag_value;
+	if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
+	{
+		int errcode = errno;
+		char errmsg[256];
+		log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
+				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+		exit(__LINE__);
+	}
+
+	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
+	while(0 != run_flag_value && samples_done < required_samples)
+	{
+		(*prm->bit_attack)(prm->id, prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctr_1, prm->ctr_2);
+
+		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
+		{
+			int errcode = errno;
+			char errmsg[256];
+			log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
+					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+			exit(__LINE__);
+		}
+	}
+
+	prm->attack_done = true;
+	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
+	return NULL;
 }
 

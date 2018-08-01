@@ -36,7 +36,6 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 int u03_bit_attack_check(const size_t bit_offset, const char * logcat,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
-void * attacker(void *);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
 
@@ -739,51 +738,6 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_in
 	{
 		U0 |= ( U3 & left_rotate(1, 49 + j->id) ) ^ left_rotate(v[j->id][1], 49 + j->id);
 	}
-}
-
-void * attacker(void * arg)
-{
-	attacker_t * prm = (attacker_t *)arg;
-
-	char atckr_locat[32];
-	snprintf(atckr_locat, 32, "%s.%lu", prm->logcat.c_str(), prm->id);
-	prm->logcat = atckr_locat;
-
-	aes_prg prg;
-	if(0 != prg.init(BLOCK_SIZE))
-	{
-		log4cpp::Category::getInstance(prm->logcat).error("%s: prg.init() failure", __FUNCTION__);
-		return NULL;
-	}
-
-	int run_flag_value;
-	if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
-	{
-		int errcode = errno;
-		char errmsg[256];
-		log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
-				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
-		exit(__LINE__);
-	}
-
-	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
-	while(0 != run_flag_value && samples_done < required_samples)
-	{
-		(*prm->bit_attack)(prm->id, prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctr_1, prm->ctr_2);
-
-		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
-		{
-			int errcode = errno;
-			char errmsg[256];
-			log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
-					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
-			exit(__LINE__);
-		}
-	}
-
-	prm->attack_done = true;
-	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
-	return NULL;
 }
 
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset)
