@@ -23,29 +23,6 @@
 namespace ATTACK_U03
 {
 
-static const size_t thread_count = 64;
-static const time_t allotted_time = 28/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
-static const struct timeval _3sec = {3,0};
-
-typedef struct
-{
-	size_t id;
-	std::string logcat;
-	sem_t * run_flag;
-	bool attack_done;
-	u_int8_t * key, * iv;
-	u_int64_t init_state[4][5];
-	u_int64_t ctr_1[4], ctr_2[4];
-}attacker_t;
-
-typedef struct
-{
-	struct event_base * the_base;
-	std::string locat;
-	std::vector<attacker_t> * atckr_prms;
-	time_t start_time;
-}event_param_t;
-
 int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
 int generate_input_p2(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
 int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * Perm_output);
@@ -204,8 +181,10 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 
 							guess_work(atckr_prms, U0, U3, locat);
 
-							log4cpp::Category::getInstance(logcat).notice("%s: actual U0 = 0x%016lX.", __FUNCTION__, init_state[0][4]);
-							log4cpp::Category::getInstance(logcat).notice("%s: actual U3 = 0x%016lX.", __FUNCTION__, init_state[3][4]);
+							log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U0);
+							log4cpp::Category::getInstance(logcat).notice("%s: actual  U0 = 0x%016lX.", __FUNCTION__, init_state[0][4]);
+							log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
+							log4cpp::Category::getInstance(logcat).notice("%s: actual  U3 = 0x%016lX.", __FUNCTION__, init_state[3][4]);
 
 							{
 								u_int64_t u3cmp = ~(U3 ^ init_state[3][4]);
@@ -736,7 +715,7 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_in
 		{
 			dev = (0 != j->ctr_1[i])? fabs( ( double(j->ctr_2[i]) / double(j->ctr_1[i]) ) - 0.5 ): 0.0;
 
-			log4cpp::Category::getInstance(j->logcat).notice("%s: ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.08f;",
+			log4cpp::Category::getInstance(j->logcat).debug("%s: ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.08f;",
 					__FUNCTION__, i, j->ctr_1[i], i, j->ctr_2[i], dev);
 
 			if(max_dev < dev)
@@ -745,13 +724,11 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_in
 				max_dev_counter_index = i;
 			}
 		}
-		log4cpp::Category::getInstance(j->logcat).debug("%s: selected ctr = %lu.",
-				__FUNCTION__, max_dev_counter_index);
 
 		v[j->id][0] = (max_dev_counter_index & 0x2)? 1: 0;
 		v[j->id][1] = (max_dev_counter_index & 0x1)? 1: 0;
 
-		log4cpp::Category::getInstance(j->logcat).notice("%s: selected ctr-idx = %lu; v0 = %lu; v1 = %lu.",
+		log4cpp::Category::getInstance(j->logcat).debug("%s: selected ctr-idx = %lu; v0 = %lu; v1 = %lu.",
 				__FUNCTION__, max_dev_counter_index, v[j->id][0], v[j->id][1]);
 
 		U3 |= left_rotate((v[j->id][0] ^ 1), 31 + j->id);
@@ -761,8 +738,6 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_in
 	{
 		U0 |= ( U3 & left_rotate(1, 49 + j->id) ) ^ left_rotate(v[j->id][1], 49 + j->id);
 	}
-	log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U0);
-	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
 }
 
 void * attacker(void * arg)

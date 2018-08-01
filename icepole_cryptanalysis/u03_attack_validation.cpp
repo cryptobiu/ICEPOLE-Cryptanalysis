@@ -1,5 +1,6 @@
 
 #include <stdlib.h>
+#include <semaphore.h>
 
 #include <log4cpp/Category.hh>
 

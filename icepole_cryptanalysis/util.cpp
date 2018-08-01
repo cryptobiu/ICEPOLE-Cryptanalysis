@@ -1,6 +1,7 @@
 
 #include <stdlib.h>
 #include <memory.h>
+#include <semaphore.h>
 #include <sstream>
 #include <iomanip>
 

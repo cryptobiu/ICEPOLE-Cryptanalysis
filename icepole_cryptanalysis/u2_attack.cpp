@@ -21,28 +21,6 @@
 
 namespace ATTACK_U2
 {
-static const size_t thread_count = 64;
-static const time_t allotted_time = 28/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
-static const struct timeval _3sec = {3,0};
-
-typedef struct
-{
-	size_t id;
-	std::string logcat;
-	sem_t * run_flag;
-	bool attack_done;
-	u_int8_t * key, * iv;
-	u_int64_t init_state[4][5];
-	u_int64_t ctr_1[4], ctr_2[4];
-}attacker_t;
-
-typedef struct
-{
-	struct event_base * the_base;
-	std::string locat;
-	std::vector<attacker_t> * atckr_prms;
-	time_t start_time;
-}event_param_t;
 
 void sigint_cb(evutil_socket_t, short, void * arg)
 {
@@ -191,7 +169,8 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 
 							guess_work(atckr_prms, U2, locat);
 
-							log4cpp::Category::getInstance(logcat).notice("%s: actual U2 = 0x%016lX.", __FUNCTION__, init_state[2][4]);
+							log4cpp::Category::getInstance(logcat).notice("%s: guessed U2 = 0x%016lX.", __FUNCTION__, U2);
+							log4cpp::Category::getInstance(logcat).notice("%s: actual  U2 = 0x%016lX.", __FUNCTION__, init_state[2][4]);
 
 							{
 								u_int64_t u2cmp = ~(U2 ^ init_state[2][4]);
@@ -202,8 +181,6 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 							}
 
 							result = 0;
-
-							/////////////////////////////////////////////////////////////////////////////////////////////////
 
 							event_del(timer_evt);
 							log4cpp::Category::getInstance(logcat).debug("%s: the timer event was removed.", __FUNCTION__);
@@ -251,6 +228,20 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
 	}
 	return result;
+}
+
+void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, const char * logcat)
+{
+	U2 = 0;
+	for(size_t j = 0; j < thread_count; ++j)
+	{
+		attacker_t & aj(atckr_prms[j]);
+		double dev = (aj.ctr_1[0] != 0)? fabs( ( double(aj.ctr_2[0]) / double(aj.ctr_1[0]) ) - 0.5): 0.0;
+		if(pow(2.0, -9.83) >= dev)
+		{
+			U2 |= left_rotate(0x1, 27 + j);
+		}
+	}
 }
 
 }
