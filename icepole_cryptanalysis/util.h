@@ -14,6 +14,8 @@ void log_state(const char * label, const u_int64_t state[4][5], const char * log
 u_int64_t left_rotate(u_int64_t v, size_t r);
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
 
+class aes_prg;
+
 typedef struct
 {
 	size_t id;
@@ -23,6 +25,11 @@ typedef struct
 	u_int8_t * key, * iv;
 	u_int64_t init_state[4][5];
 	u_int64_t ctr_1[4], ctr_2[4];
+
+	int (*bit_attack)(const size_t bit_offset, const char * logcat,
+				   	  const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+					  aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
+
 }attacker_t;
 
 typedef struct

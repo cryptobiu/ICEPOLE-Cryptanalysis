@@ -30,12 +30,12 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C);
-int bit_attack(const size_t bit_offset,
+int bit_attack(const size_t bit_offset, const char * logcat,
 			   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-			   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
-int u03_bit_attack_check(const size_t bit_offset,
+			   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
+int u03_bit_attack_check(const size_t bit_offset, const char * logcat,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-						 aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
+						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
 void * attacker(void *);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
@@ -140,6 +140,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
+								atckr_prms[i].bit_attack = bit_attack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -252,9 +253,9 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	return result;
 }
 
-int bit_attack(const size_t bit_offset,
+int bit_attack(const size_t bit_offset, const char * logcat,
 				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4])
+				   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
 {
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
@@ -283,9 +284,9 @@ int bit_attack(const size_t bit_offset,
 	return 0;
 }
 
-int u03_bit_attack_check(const size_t bit_offset,
+int u03_bit_attack_check(const size_t bit_offset, const char * logcat,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-						 aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4])
+						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
 {
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
@@ -768,7 +769,7 @@ void * attacker(void * arg)
 	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
 	while(0 != run_flag_value && samples_done < required_samples)
 	{
-		bit_attack(prm->id, prm->key, prm->iv, prm->init_state, prg, prm->logcat.c_str(), prm->ctr_1, prm->ctr_2);
+		(*prm->bit_attack)(prm->id, prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctr_1, prm->ctr_2);
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
