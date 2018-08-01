@@ -12,3 +12,4 @@ void log_block(const char * label, const u_int64_t * block, const char * logcat,
 void log_state(const char * label, const u_int64_t state[4][5], const char * logcat, const int level);
 
 u_int64_t left_rotate(u_int64_t v, size_t r);
+void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);

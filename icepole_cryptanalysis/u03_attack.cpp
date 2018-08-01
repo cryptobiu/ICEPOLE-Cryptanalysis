@@ -20,6 +20,9 @@
 #include "util.h"
 #include "u03_attack_validation.h"
 
+namespace ATTACK_U03
+{
+
 const size_t u03_thread_count = 64;
 const time_t allotted_time = 2/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
 
@@ -49,13 +52,12 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C);
-int u03_bit_attack(const size_t bit_offset,
-				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
+int bit_attack(const size_t bit_offset,
+			   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+			   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
 int u03_bit_attack_check(const size_t bit_offset,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 						 aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
-void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
 void * u03_attacker(void *);
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
@@ -269,7 +271,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	return result;
 }
 
-int u03_bit_attack(const size_t bit_offset,
+int bit_attack(const size_t bit_offset,
 				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 				   aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4])
 {
@@ -714,20 +716,6 @@ int generate_input_p2(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P
 	return 0;
 }
 
-void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv)
-{
-	u_int8_t C[128+16];
-	memset(C, 0, 128+16);
-	unsigned long long clen = 128+16;
-
-	u_int8_t P[128] = { 0 };
-
-	u_int64_t is[4][5];
-	memset(is, 0, 20*sizeof(u_int64_t));
-
-	crypto_aead_encrypt_i((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key, ib);
-}
-
 void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
 {
 	//counter-1 [ [3][1][41] , [3][3][41] ] ==> counter-1 [ v0 , v1 ]
@@ -803,7 +791,7 @@ void * u03_attacker(void * arg)
 	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
 	while(0 != run_flag_value && samples_done < required_samples)
 	{
-		u03_bit_attack(prm->id, prm->key, prm->iv, prm->init_state, prg, prm->logcat.c_str(), prm->ctr_1, prm->ctr_2);
+		bit_attack(prm->id, prm->key, prm->iv, prm->init_state, prg, prm->logcat.c_str(), prm->ctr_1, prm->ctr_2);
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
@@ -833,3 +821,5 @@ u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset)
 	}
 	return result;
 }
+
+}//namespace ATTACK_U03
