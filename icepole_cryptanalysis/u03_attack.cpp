@@ -25,7 +25,6 @@ namespace ATTACK_U03
 
 int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
 int generate_input_p2(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
-int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * Perm_output);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
@@ -33,51 +32,11 @@ size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C);
 int bit_attack(const size_t bit_offset, const char * logcat,
 			   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 			   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
-int u03_bit_attack_check(const size_t bit_offset, const char * logcat,
-				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
+int bit_attack_check(const size_t bit_offset, const char * logcat,
+				   	 const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+					 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
-
-void sigint_cb(evutil_socket_t, short, void * arg)
-{
-	event_param_t * eprm = (event_param_t *)arg;
-	log4cpp::Category::getInstance(eprm->locat).notice("%s: SIGINT caught; breaking event loop.", __FUNCTION__);
-	event_base_loopbreak(eprm->the_base);
-}
-
-void timer_cb(evutil_socket_t, short, void * arg)
-{
-	event_param_t * eprm = (event_param_t *)arg;
-
-	bool all_attacks_done = true;
-	size_t samples_done;
-	for(size_t i = 0; i < thread_count; ++i)
-	{
-		all_attacks_done = all_attacks_done && (*eprm->atckr_prms)[i].attack_done;
-		samples_done = (*eprm->atckr_prms)[i].ctr_1[0] +
-					   (*eprm->atckr_prms)[i].ctr_1[1] +
-					   (*eprm->atckr_prms)[i].ctr_1[2] +
-					   (*eprm->atckr_prms)[i].ctr_1[3];
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: thread %lu collected %lu samples.", __FUNCTION__, i, samples_done);
-	}
-
-	if(all_attacks_done)
-	{
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: all samples are done for all threads; breaking event loop.", __FUNCTION__);
-		event_base_loopbreak(eprm->the_base);
-		return;
-	}
-
-	time_t now = time(NULL);
-	if(now > (eprm->start_time + allotted_time))
-	{
-		log4cpp::Category::getInstance(eprm->locat).info("%s: start=%lu; allotted=%lu; now=%lu;", __FUNCTION__, eprm->start_time, allotted_time, now);
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: allotted time of %lu seconds is up; breaking event loop.", __FUNCTION__, allotted_time);
-		event_base_loopbreak(eprm->the_base);
-		return;
-	}
-}
 
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3)
 {
@@ -133,12 +92,13 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								atckr_prms[i].id = i;
 								atckr_prms[i].logcat = locat;
 								atckr_prms[i].run_flag = &run_flag;
-								atckr_prms[i].attack_done = false;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
+								atckr_prms[i].attacks_done = 0;
+								atckr_prms[i].required_attacks = pow(2, 33.9) + 1;
 								atckr_prms[i].bit_attack = bit_attack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
@@ -283,7 +243,7 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 	return 0;
 }
 
-int u03_bit_attack_check(const size_t bit_offset, const char * logcat,
+int bit_attack_check(const size_t bit_offset, const char * logcat,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
 {
@@ -430,26 +390,6 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 
 	//set the 2nd block of P1 to zeroes
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
-	return 0;
-}
-
-int get_permutation_output(const u_int64_t * P, const u_int64_t * C, u_int64_t * Perm_output)
-{
-	const u_int64_t * P_2nd_block = (P+BLONG_SIZE), * C_2nd_block = (C+BLONG_SIZE);
-
-	/* Actual implementation
-	for(int x = 0; x < 4; ++x)
-	{
-		for(int y = 0; y < 4; ++y)
-		{
-			RC2I(Perm_output,x,y) = RC2I(P_2nd_block,x,y) ^ RC2I(C_2nd_block,x,y);
-		}
-	}
-	*/
-
-	//P_2nd_block is all zeros hence P_2nd_block ^ C_2nd_block = C_2nd_block!!
-	memcpy(Perm_output, C_2nd_block, BLOCK_SIZE);
-
 	return 0;
 }
 

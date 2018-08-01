@@ -8,6 +8,7 @@
 #include <iomanip>
 
 #include <openssl/evp.h>
+#include <event2/event.h>
 #include <log4cpp/Category.hh>
 
 #include "util.h"
@@ -64,6 +65,48 @@ void log_state(const char * label, const u_int64_t state[4][5], const char * log
 	}
 }
 
+void sigint_cb(evutil_socket_t, short, void * arg)
+{
+	event_param_t * eprm = (event_param_t *)arg;
+	log4cpp::Category::getInstance(eprm->locat).notice("%s: SIGINT caught; breaking event loop.", __FUNCTION__);
+	event_base_loopbreak(eprm->the_base);
+}
+
+void timer_cb(evutil_socket_t, short, void * arg)
+{
+	event_param_t * eprm = (event_param_t *)arg;
+
+	bool all_attacks_done = true;
+	size_t samples_done, attacks_done;
+	for(size_t i = 0; i < thread_count; ++i)
+	{
+		all_attacks_done = all_attacks_done && ((*eprm->atckr_prms)[i].attacks_done >= (*eprm->atckr_prms)[i].required_attacks);
+		samples_done = (*eprm->atckr_prms)[i].ctr_1[0] +
+					   (*eprm->atckr_prms)[i].ctr_1[1] +
+					   (*eprm->atckr_prms)[i].ctr_1[2] +
+					   (*eprm->atckr_prms)[i].ctr_1[3];
+		attacks_done = (*eprm->atckr_prms)[i].attacks_done;
+		log4cpp::Category::getInstance(eprm->locat).notice("%s: thread %lu collected %lu samples in %lu attacks.",
+				__FUNCTION__, i, samples_done, attacks_done);
+	}
+
+	if(all_attacks_done)
+	{
+		log4cpp::Category::getInstance(eprm->locat).notice("%s: all samples are done for all threads; breaking event loop.", __FUNCTION__);
+		event_base_loopbreak(eprm->the_base);
+		return;
+	}
+
+	time_t now = time(NULL);
+	if(now > (eprm->start_time + allotted_time))
+	{
+		log4cpp::Category::getInstance(eprm->locat).info("%s: start=%lu; allotted=%lu; now=%lu;", __FUNCTION__, eprm->start_time, allotted_time, now);
+		log4cpp::Category::getInstance(eprm->locat).notice("%s: allotted time of %lu seconds is up; breaking event loop.", __FUNCTION__, allotted_time);
+		event_base_loopbreak(eprm->the_base);
+		return;
+	}
+}
+
 u_int64_t left_rotate(u_int64_t v, size_t r)
 {
 	r = r % 64;
@@ -109,8 +152,7 @@ void * attacker(void * arg)
 		exit(__LINE__);
 	}
 
-	size_t required_samples = (size_t)pow(2, 22), samples_done = 0;
-	while(0 != run_flag_value && samples_done < required_samples)
+	while(0 != run_flag_value && prm->required_attacks > prm->attacks_done++)
 	{
 		(*prm->bit_attack)(prm->id, prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctr_1, prm->ctr_2);
 
@@ -123,8 +165,6 @@ void * attacker(void * arg)
 			exit(__LINE__);
 		}
 	}
-
-	prm->attack_done = true;
 	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
 	return NULL;
 }

@@ -11,6 +11,9 @@ void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, 
 void log_block(const char * label, const u_int64_t * block, const char * logcat, const int level);
 void log_state(const char * label, const u_int64_t state[4][5], const char * logcat, const int level);
 
+void sigint_cb(evutil_socket_t, short, void * arg);
+void timer_cb(evutil_socket_t, short, void * arg);
+
 u_int64_t left_rotate(u_int64_t v, size_t r);
 void get_init_block(u_int64_t ib[4][5], const u_int8_t * key, const u_int8_t * iv);
 
@@ -21,10 +24,10 @@ typedef struct
 	size_t id;
 	std::string logcat;
 	sem_t * run_flag;
-	bool attack_done;
 	u_int8_t * key, * iv;
 	u_int64_t init_state[4][5];
 	u_int64_t ctr_1[4], ctr_2[4];
+	size_t required_attacks, attacks_done;
 
 	int (*bit_attack)(const size_t bit_offset, const char * logcat,
 				   	  const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],

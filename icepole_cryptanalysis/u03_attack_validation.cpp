@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <semaphore.h>
 
+#include <event2/event.h>
 #include <log4cpp/Category.hh>
 
 #include "icepole128av2/ref/encrypt.h"

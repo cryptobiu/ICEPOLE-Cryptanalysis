@@ -22,47 +22,16 @@
 namespace ATTACK_U2
 {
 
-void sigint_cb(evutil_socket_t, short, void * arg)
-{
-	event_param_t * eprm = (event_param_t *)arg;
-	log4cpp::Category::getInstance(eprm->locat).notice("%s: SIGINT caught; breaking event loop.", __FUNCTION__);
-	event_base_loopbreak(eprm->the_base);
-}
-
-void timer_cb(evutil_socket_t, short, void * arg)
-{
-	event_param_t * eprm = (event_param_t *)arg;
-
-	bool all_attacks_done = true;
-	size_t samples_done;
-	for(size_t i = 0; i < thread_count; ++i)
-	{
-		all_attacks_done = all_attacks_done && (*eprm->atckr_prms)[i].attack_done;
-		samples_done = (*eprm->atckr_prms)[i].ctr_1[0] +
-					   (*eprm->atckr_prms)[i].ctr_1[1] +
-					   (*eprm->atckr_prms)[i].ctr_1[2] +
-					   (*eprm->atckr_prms)[i].ctr_1[3];
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: thread %lu collected %lu samples.", __FUNCTION__, i, samples_done);
-	}
-
-	if(all_attacks_done)
-	{
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: all samples are done for all threads; breaking event loop.", __FUNCTION__);
-		event_base_loopbreak(eprm->the_base);
-		return;
-	}
-
-	time_t now = time(NULL);
-	if(now > (eprm->start_time + allotted_time))
-	{
-		log4cpp::Category::getInstance(eprm->locat).info("%s: start=%lu; allotted=%lu; now=%lu;", __FUNCTION__, eprm->start_time, allotted_time, now);
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: allotted time of %lu seconds is up; breaking event loop.", __FUNCTION__, allotted_time);
-		event_base_loopbreak(eprm->the_base);
-		return;
-	}
-}
-
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, const char * logcat);
+int bit_attack(const size_t bit_offset, const char * logcat,
+				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+				   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
+int bit_attack_check(const size_t bit_offset, const char * logcat,
+				   	 const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+					 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
+int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
+int generate_input_p2(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 
 int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U2, const u_int64_t & U0, const u_int64_t & U3)
 {
@@ -121,12 +90,14 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 								atckr_prms[i].id = i;
 								atckr_prms[i].logcat = locat;
 								atckr_prms[i].run_flag = &run_flag;
-								atckr_prms[i].attack_done = false;
 								atckr_prms[i].key = (u_int8_t *)key;
 								atckr_prms[i].iv = (u_int8_t *)iv;
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
+								atckr_prms[i].attacks_done = 0;
+								atckr_prms[i].required_attacks = pow(2, 30);
+								atckr_prms[i].bit_attack = bit_attack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -241,6 +212,36 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, cons
 			U2 |= left_rotate(0x1, 27 + j);
 		}
 	}
+}
+
+int bit_attack(const size_t bit_offset, const char * logcat,
+				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+				   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+	u_int8_t F1 = 0, F2 = 0;
+	u_int64_t x_state[4][5];
+
+	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
+	kappa5((unsigned char *)(C+BLONG_SIZE));
+
+	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
+	{
+		generate_input_p2(bit_offset, P1, P2, logcat);
+		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
+		kappa5((unsigned char *)(C+BLONG_SIZE));
+		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
+		{
+			ctr_1[0]++;
+			if(F1 == F2)
+				ctr_2[0]++;
+		}
+	}
+	return 0;
 }
 
 }
