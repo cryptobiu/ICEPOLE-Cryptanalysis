@@ -23,9 +23,9 @@
 namespace ATTACK_U03
 {
 
-const size_t u03_thread_count = 64;
-//const time_t allotted_time = 2/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
-const time_t allotted_time = 28/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
+static const size_t thread_count = 64;
+static const time_t allotted_time = 28/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
+static const struct timeval _3sec = {3,0};
 
 typedef struct
 {
@@ -36,13 +36,13 @@ typedef struct
 	u_int8_t * key, * iv;
 	u_int64_t init_state[4][5];
 	u_int64_t ctr_1[4], ctr_2[4];
-}u03_attacker_t;
+}attacker_t;
 
 typedef struct
 {
 	struct event_base * the_base;
 	std::string locat;
-	std::vector<u03_attacker_t> * atckr_prms;
+	std::vector<attacker_t> * atckr_prms;
 	time_t start_time;
 }event_param_t;
 
@@ -59,8 +59,8 @@ int bit_attack(const size_t bit_offset,
 int u03_bit_attack_check(const size_t bit_offset,
 				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 						 aes_prg & prg, const char * logcat, size_t ctr_1[4], size_t ctr_2[4]);
-void * u03_attacker(void *);
-void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
+void * attacker(void *);
+void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
 
 void sigint_cb(evutil_socket_t, short, void * arg)
@@ -76,7 +76,7 @@ void timer_cb(evutil_socket_t, short, void * arg)
 
 	bool all_attacks_done = true;
 	size_t samples_done;
-	for(size_t i = 0; i < u03_thread_count; ++i)
+	for(size_t i = 0; i < thread_count; ++i)
 	{
 		all_attacks_done = all_attacks_done && (*eprm->atckr_prms)[i].attack_done;
 		samples_done = (*eprm->atckr_prms)[i].ctr_1[0] +
@@ -113,7 +113,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	u_int64_t init_state[4][5];
 	get_init_block(init_state, key, iv);
 
-	std::vector<u03_attacker_t> atckr_prms(u03_thread_count);
+	std::vector<attacker_t> atckr_prms(thread_count);
 
 	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, init_state[0][4], init_state[3][4]);
 
@@ -145,15 +145,14 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 					{
 						log4cpp::Category::getInstance(locat).debug("%s: the timer event was created.", __FUNCTION__);
 
-						struct timeval twosec = {2,0};
-						if(0 == event_add(timer_evt, &twosec))
+						if(0 == event_add(timer_evt, &_3sec))
 						{
 							log4cpp::Category::getInstance(locat).debug("%s: the timer event was added.", __FUNCTION__);
 
 							int errcode;
-							std::vector<pthread_t> atckr_thds(u03_thread_count);
+							std::vector<pthread_t> atckr_thds(thread_count);
 
-							for(size_t i = 0; i < u03_thread_count; ++i)
+							for(size_t i = 0; i < thread_count; ++i)
 							{
 								atckr_prms[i].id = i;
 								atckr_prms[i].logcat = locat;
@@ -164,16 +163,16 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
-								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, u03_attacker, (void *)(atckr_prms.data() + i))))
+								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
 									log4cpp::Category::getInstance(locat).error("%s: pthread_create() failed with error %d : [%s]",
 											__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
 									exit(__LINE__);
 								}
-								log4cpp::Category::getInstance(locat).debug("%s: u03 attacker thread %lu started.", __FUNCTION__, i);
+								log4cpp::Category::getInstance(locat).debug("%s: attacker thread %lu started.", __FUNCTION__, i);
 							}
-							log4cpp::Category::getInstance(locat).notice("%s: all u03 attacker threads are run.", __FUNCTION__);
+							log4cpp::Category::getInstance(locat).notice("%s: all attacker threads are run.", __FUNCTION__);
 
 							log4cpp::Category::getInstance(locat).notice("%s: event loop started.", __FUNCTION__);
 							event_base_dispatch(the_base);
@@ -187,9 +186,9 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 										__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
 								exit(__LINE__);
 							}
-							log4cpp::Category::getInstance(locat).notice("%s: u03 attacker thread run signal is down.", __FUNCTION__);
+							log4cpp::Category::getInstance(locat).notice("%s: attacker thread run signal is down.", __FUNCTION__);
 
-							for(size_t i = 0; i < u03_thread_count; ++i)
+							for(size_t i = 0; i < thread_count; ++i)
 							{
 								void * retval = NULL;
 								if(0 != (errcode = pthread_join(atckr_thds[i], &retval)))
@@ -199,9 +198,9 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 											__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
 									exit(__LINE__);
 								}
-								log4cpp::Category::getInstance(locat).debug("%s: u03 attacker thread %lu joined.", __FUNCTION__, i);
+								log4cpp::Category::getInstance(locat).debug("%s: attacker thread %lu joined.", __FUNCTION__, i);
 							}
-							log4cpp::Category::getInstance(locat).notice("%s: all u03 attacker threads are joined.", __FUNCTION__);
+							log4cpp::Category::getInstance(locat).notice("%s: all attacker threads are joined.", __FUNCTION__);
 
 							guess_work(atckr_prms, U0, U3, locat);
 
@@ -719,7 +718,7 @@ int generate_input_p2(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P
 	return 0;
 }
 
-void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
+void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
 {
 	//counter-1 [ [3][1][41] , [3][3][41] ] ==> counter-1 [ v0 , v1 ]
 
@@ -729,7 +728,7 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 	u_int64_t v[64][2];
 	memset(v, 0, 64 * 2 * sizeof(u_int64_t));
 
-	for(std::vector<u03_attacker_t>::const_iterator j = atckr_prms.begin(); j != atckr_prms.end(); ++j)
+	for(std::vector<attacker_t>::const_iterator j = atckr_prms.begin(); j != atckr_prms.end(); ++j)
 	{
 		size_t max_dev_counter_index = 4;
 		double max_dev = 0.0, dev;
@@ -758,7 +757,7 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 		U3 |= left_rotate((v[j->id][0] ^ 1), 31 + j->id);
 	}
 
-	for(std::vector<u03_attacker_t>::const_iterator j = atckr_prms.begin(); j != atckr_prms.end(); ++j)
+	for(std::vector<attacker_t>::const_iterator j = atckr_prms.begin(); j != atckr_prms.end(); ++j)
 	{
 		U0 |= ( U3 & left_rotate(1, 49 + j->id) ) ^ left_rotate(v[j->id][1], 49 + j->id);
 	}
@@ -766,9 +765,9 @@ void guess_work(const std::vector<u03_attacker_t> & atckr_prms, u_int64_t & U0, 
 	log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
 }
 
-void * u03_attacker(void * arg)
+void * attacker(void * arg)
 {
-	u03_attacker_t * prm = (u03_attacker_t *)arg;
+	attacker_t * prm = (attacker_t *)arg;
 
 	char atckr_locat[32];
 	snprintf(atckr_locat, 32, "%s.%lu", prm->logcat.c_str(), prm->id);
