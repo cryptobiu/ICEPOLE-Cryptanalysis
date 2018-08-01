@@ -24,7 +24,8 @@ namespace ATTACK_U03
 {
 
 const size_t u03_thread_count = 64;
-const time_t allotted_time = 2/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
+//const time_t allotted_time = 2/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
+const time_t allotted_time = 28/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
 
 typedef struct
 {
@@ -222,6 +223,8 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 									if(m & u0cmp) eq_bit_cnt++;
 								log4cpp::Category::getInstance(locat).notice("%s: correct guessed U0 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 							}
+
+							result = 0;
 
 							event_del(timer_evt);
 							log4cpp::Category::getInstance(locat).debug("%s: the timer event was removed.", __FUNCTION__);
