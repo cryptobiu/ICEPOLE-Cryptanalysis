@@ -97,7 +97,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
 								atckr_prms[i].attacks_done = 0;
 								atckr_prms[i].required_attacks = pow(2, 33.9) + 1;
-								atckr_prms[i].bit_attack = bit_attack;
+								atckr_prms[i].bit_attack = bit_attack;//bit_attack_check;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -411,10 +411,18 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 	[3][3][25]
 	*/
 
-	static const row_t rows[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
-									{2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
+	static const block_bit_t bits[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
+											{2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
 
-	return last_Sbox_lookup_filter(P_perm_output, bit_offset, rows, 8, F_xor_res, logcat);
+	return last_Sbox_lookup_filter(P_perm_output, bit_offset, bits, 8, F_xor_res, logcat);
+}
+
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset)
+{
+	static const block_bit_t bits[8] = { {0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
+										 {2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
+
+	return xor_state_bits(state, bit_offset, bits, 8);
 }
 
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C)
@@ -503,20 +511,6 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_in
 	{
 		U0 |= ( U3 & left_rotate(1, 49 + j->id) ) ^ left_rotate(v[j->id][1], 49 + j->id);
 	}
-}
-
-u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset)
-{
-	static const struct __bit_t { size_t x; size_t y; size_t z; } bits[8] = { {0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
-																			  {2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
-	u_int8_t result = 0;
-	for(size_t i = 0; i < 8; ++i)
-	{
-		u_int64_t integer = state[bits[i].x][bits[i].y];
-		u_int64_t mask = left_rotate(0x1, bits[i].z + bit_offset);
-		result ^= ((integer & mask)? 1: 0);
-	}
-	return result;
 }
 
 }//namespace ATTACK_U03

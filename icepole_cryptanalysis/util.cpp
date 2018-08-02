@@ -174,9 +174,10 @@ void * attacker(void * arg)
 		exit(__LINE__);
 	}
 
-	while(0 != run_flag_value && prm->required_attacks > prm->attacks_done++)
+	while(0 != run_flag_value)
 	{
 		(*prm->bit_attack)(prm->id, prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctr_1, prm->ctr_2);
+		prm->attacks_done++;
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
@@ -348,25 +349,37 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 }
 
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset,
-							 const row_t * rows, const size_t row_count,
+							 const block_bit_t * bits, const size_t bit_count,
 							 u_int8_t & F_xor_res, const char * logcat)
 {
 	u_int8_t row_bits, input_bit;
 	F_xor_res = 0;
 
-	for(size_t i = 0; i < row_count; ++i)
+	for(size_t i = 0; i < bit_count; ++i)
 	{
-		row_t current_row = rows[i];
-		current_row.z = (current_row.z + bit_offset)%64;
+		block_bit_t current_bit = bits[i];
+		current_bit.z = (current_bit.z + bit_offset)%64;
 
-		row_bits = get_block_row_bits(P_perm_output, current_row.x, current_row.z);
+		row_bits = get_block_row_bits(P_perm_output, current_bit.x, current_bit.z);
 		input_bit = 0;
 
-		if(lookup_Sbox_input_bit(row_bits, current_row.y, input_bit))
+		if(lookup_Sbox_input_bit(row_bits, current_bit.y, input_bit))
 			F_xor_res ^= input_bit;
 		else
 			return false;
 	}
 	return true;
+}
+
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count)
+{
+	u_int8_t result = 0;
+	for(size_t i = 0; i < bit_count; ++i)
+	{
+		u_int64_t integer = state[bits[i].x][bits[i].y];
+		u_int64_t mask = left_rotate(0x1, bits[i].z + bit_offset);
+		result ^= ((integer & mask)? 1: 0);
+	}
+	return result;
 }
 

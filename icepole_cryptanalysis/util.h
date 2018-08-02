@@ -56,8 +56,9 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 typedef struct
 {
 	size_t x, y, z;
-}row_t;
+}block_bit_t;
 
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset,
-							 const row_t * rows, const size_t row_count,
+							 const block_bit_t * bits, const size_t bit_count,
 							 u_int8_t & F_xor_res, const char * logcat);
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count);

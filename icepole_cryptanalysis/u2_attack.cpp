@@ -29,9 +29,13 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 int bit_attack_check(const size_t bit_offset, const char * logcat,
 				   	 const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 					 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
+int bit_attack_hack(const size_t bit_offset, const char * logcat,
+				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
 int generate_input_p1(const size_t bit_offset, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
 int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
 
 int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U2, const u_int64_t & U0, const u_int64_t & U3)
 {
@@ -99,7 +103,176 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
 								atckr_prms[i].attacks_done = 0;
 								atckr_prms[i].required_attacks = pow(2, 30);
-								atckr_prms[i].bit_attack = bit_attack;
+								atckr_prms[i].bit_attack = bit_attack_check;//bit_attack;
+								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
+								{
+									char errmsg[256];
+									log4cpp::Category::getInstance(locat).error("%s: pthread_create() failed with error %d : [%s]",
+											__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+									exit(__LINE__);
+								}
+								log4cpp::Category::getInstance(locat).debug("%s: attacker thread %lu started.", __FUNCTION__, i);
+							}
+							log4cpp::Category::getInstance(locat).notice("%s: all attacker threads are run.", __FUNCTION__);
+
+							log4cpp::Category::getInstance(locat).notice("%s: event loop started.", __FUNCTION__);
+							event_base_dispatch(the_base);
+							log4cpp::Category::getInstance(locat).notice("%s: event loop stopped.", __FUNCTION__);
+
+							if(0 != sem_wait(&run_flag))
+							{
+								int errcode = errno;
+								char errmsg[256];
+								log4cpp::Category::getInstance(locat).error("%s: sem_wait() failed with error %d : [%s]",
+										__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+								exit(__LINE__);
+							}
+							log4cpp::Category::getInstance(locat).notice("%s: attacker thread run signal is down.", __FUNCTION__);
+
+							for(size_t i = 0; i < thread_count; ++i)
+							{
+								void * retval = NULL;
+								if(0 != (errcode = pthread_join(atckr_thds[i], &retval)))
+								{
+									char errmsg[256];
+									log4cpp::Category::getInstance(locat).error("%s: pthread_join() failed with error %d : [%s]",
+											__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+									exit(__LINE__);
+								}
+								log4cpp::Category::getInstance(locat).debug("%s: attacker thread %lu joined.", __FUNCTION__, i);
+							}
+							log4cpp::Category::getInstance(locat).notice("%s: all attacker threads are joined.", __FUNCTION__);
+
+							guess_work(atckr_prms, U2, locat);
+
+							log4cpp::Category::getInstance(logcat).notice("%s: guessed U2 = 0x%016lX.", __FUNCTION__, U2);
+							log4cpp::Category::getInstance(logcat).notice("%s: actual  U2 = 0x%016lX.", __FUNCTION__, init_state[2][4]);
+
+							{
+								u_int64_t u2cmp = ~(U2 ^ init_state[2][4]);
+								size_t eq_bit_cnt = 0;
+								for(u_int64_t m = 0x1; m != 0; m <<= 1)
+									if(m & u2cmp) eq_bit_cnt++;
+								log4cpp::Category::getInstance(locat).notice("%s: correct guessed U2 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+							}
+
+							result = 0;
+
+							event_del(timer_evt);
+							log4cpp::Category::getInstance(logcat).debug("%s: the timer event was removed.", __FUNCTION__);
+						}
+						else
+							log4cpp::Category::getInstance(logcat).error("%s: event_add(timer) failed.", __FUNCTION__);
+
+						event_free(timer_evt);
+						log4cpp::Category::getInstance(logcat).debug("%s: the timer event was freed.", __FUNCTION__);
+					}
+					else
+						log4cpp::Category::getInstance(logcat).error("%s: event_new() failed.", __FUNCTION__);
+
+					event_del(sigint_evt);
+					log4cpp::Category::getInstance(logcat).debug("%s: the SIGINT event was removed.", __FUNCTION__);
+				}
+				else
+					log4cpp::Category::getInstance(logcat).error("%s: event_add(sigint) failed.", __FUNCTION__);
+
+				event_free(sigint_evt);
+				log4cpp::Category::getInstance(logcat).debug("%s: the SIGINT event was freed.", __FUNCTION__);
+			}
+			else
+				log4cpp::Category::getInstance(logcat).error("%s: evsignal_new() failed.", __FUNCTION__);
+
+			event_base_free(the_base);
+			log4cpp::Category::getInstance(logcat).debug("%s: the event base was destroyed.", __FUNCTION__);
+		}
+		else
+			log4cpp::Category::getInstance(logcat).error("%s: event_base_new() failed.", __FUNCTION__);
+
+		if(0 != sem_destroy(&run_flag))
+		{
+			int errcode = errno;
+			char errmsg[256];
+			log4cpp::Category::getInstance(logcat).error("%s: sem_destroy() failed with error %d : [%s]",
+					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+		}
+	}
+	else
+	{
+		int errcode = errno;
+		char errmsg[256];
+		log4cpp::Category::getInstance(logcat).error("%s: sem_init() failed with error %d : [%s]",
+				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+	}
+	return result;
+}
+
+int attack_u2_hack(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U2, const u_int64_t & U0, const u_int64_t & U3)
+{
+	int result = -1;
+
+	char locat[32];
+	snprintf(locat, 32, "%s.u2", logcat);
+
+	u_int64_t init_state[4][5];
+	get_init_block(init_state, key, iv, logcat);
+	//init_state[0][4] = U0;
+	//init_state[3][4] = U3;
+
+	std::vector<attacker_t> atckr_prms(thread_count);
+
+	log4cpp::Category::getInstance(logcat).notice("%s: Provided: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, U0, U3);
+	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
+			__FUNCTION__, init_state[0][4], init_state[2][4], init_state[3][4]);
+
+	sem_t run_flag;
+	if(0 == sem_init(&run_flag, 0, 1))
+	{
+		struct event_base * the_base = event_base_new();
+		if(NULL != the_base)
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: the event base was created.", __FUNCTION__);
+
+			event_param_t eprm;
+			eprm.the_base = the_base;
+			eprm.locat = locat;
+			eprm.atckr_prms = &atckr_prms;
+			eprm.start_time = time(NULL);
+
+			struct event * sigint_evt = evsignal_new(the_base, 2/*=SIGINT*/, sigint_cb, &eprm);
+			if(NULL != sigint_evt)
+			{
+				log4cpp::Category::getInstance(logcat).debug("%s: the SIGINT event was created.", __FUNCTION__);
+
+				if(0 == event_add(sigint_evt, NULL))
+				{
+					log4cpp::Category::getInstance(logcat).debug("%s: the SIGINT event was added.", __FUNCTION__);
+
+					struct event * timer_evt = event_new(the_base, -1, EV_TIMEOUT|EV_PERSIST, timer_cb, &eprm);
+					if(NULL != timer_evt)
+					{
+						log4cpp::Category::getInstance(logcat).debug("%s: the timer event was created.", __FUNCTION__);
+
+						if(0 == event_add(timer_evt, &_3sec))
+						{
+							log4cpp::Category::getInstance(logcat).debug("%s: the timer event was added.", __FUNCTION__);
+
+							/////////////////////////////////////////////////////////////////////////////////////////////////
+							int errcode;
+							std::vector<pthread_t> atckr_thds(thread_count);
+
+							for(size_t i = 0; i < thread_count; ++i)
+							{
+								atckr_prms[i].id = i;
+								atckr_prms[i].logcat = locat;
+								atckr_prms[i].run_flag = &run_flag;
+								atckr_prms[i].key = (u_int8_t *)key;
+								atckr_prms[i].iv = (u_int8_t *)iv;
+								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
+								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
+								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
+								atckr_prms[i].attacks_done = 0;
+								atckr_prms[i].required_attacks = pow(2, 18);
+								atckr_prms[i].bit_attack = bit_attack_hack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -209,9 +382,16 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, cons
 	{
 		const attacker_t & aj(atckr_prms[j]);
 		double dev = (aj.ctr_1[0] != 0)? fabs( ( double(aj.ctr_2[0]) / double(aj.ctr_1[0]) ) - 0.5): 0.0;
+		log4cpp::Category::getInstance(logcat).debug("%s: thread %lu; ctr_1=%lu; ctr_2=%lu; dev=%.05f;",
+				__FUNCTION__, aj.ctr_1[0], aj.ctr_2[0], dev);
 		if(pow(2.0, -9.83) >= dev)
 		{
+			log4cpp::Category::getInstance(logcat).debug("%s: U2 bit %lu = 1", __FUNCTION__, 27 + j);
 			U2 |= left_rotate(0x1, 27 + j);
+		}
+		else
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: U2 bit %lu = 0", __FUNCTION__, 27 + j);
 		}
 	}
 }
@@ -220,7 +400,6 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 			   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 			   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
 {
-	/**/
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
 	u_int8_t F1 = 0, F2 = 0;
@@ -231,7 +410,6 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C+BLONG_SIZE));
 
-	/*
 	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
 	{
 		generate_input_p2(bit_offset, P1, P2, logcat);
@@ -244,7 +422,92 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 			if(F1 == F2)
 				ctr_2[0]++;
 		}
-	}*/
+	}
+	return 0;
+}
+
+int bit_attack_check(const size_t bit_offset, const char * logcat,
+				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+	u_int8_t F1 = 0, F2 = 0;
+	u_int64_t x_state[4][5];
+
+	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
+	kappa5((unsigned char *)(C+BLONG_SIZE));
+
+	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
+	{
+		generate_input_p2(bit_offset, P1, P2, logcat);
+		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
+		kappa5((unsigned char *)(C+BLONG_SIZE));
+		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
+		{
+			ctr_1[0]++;
+			if(F1 == F2)
+				ctr_2[0]++;
+
+			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+			u_int8_t hF1 = xor_state_bits(x_state, bit_offset);
+
+			if(hF1 != F1)
+			{
+				log4cpp::Category::getInstance(logcat).fatal("%s: hF1 = %hhu != %hhu = F1!", __FUNCTION__, hF1, F1);
+				log_buffer("key", key, KEY_SIZE, logcat, 0);
+				log_buffer("iv ", iv, KEY_SIZE, logcat, 0);
+				log_state("x_state", x_state, logcat, 0);
+				log_block("P1", P1, logcat, 0);
+				exit(-1);
+			}
+
+			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+			u_int8_t hF2 = xor_state_bits(x_state, bit_offset);
+
+			if(hF2 != F2)
+			{
+				log4cpp::Category::getInstance(logcat).fatal("%s: hF2 = %hhu != %hhu = F2!", __FUNCTION__, hF2, F2);
+				log_buffer("key", key, KEY_SIZE, logcat, 0);
+				log_buffer("iv ", iv, KEY_SIZE, logcat, 0);
+				log_state("x_state", x_state, logcat, 0);
+				log_block("P1", P1, logcat, 0);
+				log_block("P2", P1, logcat, 0);
+				exit(-1);
+			}
+		}
+	}
+	return 0;
+}
+
+int bit_attack_hack(const size_t bit_offset, const char * logcat,
+				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+	u_int8_t F1 = 0, F2 = 0;
+	u_int64_t x_state[4][5];
+
+	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+	F1 = xor_state_bits(x_state, bit_offset);
+
+	generate_input_p2(bit_offset, P1, P2, logcat);
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+	F2 = xor_state_bits(x_state, bit_offset);
+
+	ctr_1[0]++;
+	if(F1 == F2)
+		ctr_2[0]++;
+
 	return 0;
 }
 
@@ -359,10 +622,6 @@ int attack_u2_gen_test(const char * logcat, const u_int8_t * key, const u_int8_t
 	u_int64_t init_state[4][5];
 	get_init_block(init_state, key, iv, logcat);
 
-	/*
-	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U1=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
-			__FUNCTION__, init_state[0][4],  init_state[1][4], init_state[2][4], init_state[3][4]);
-			*/
 	log_state("init_state", init_state, logcat, 500);
 
 	u_int64_t P1[2*BLONG_SIZE], P2[2*BLONG_SIZE];
@@ -396,11 +655,17 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 	[3][3][41]
 	*/
 
-	static const row_t rows[6] = { 	{0,0,3}, {0,1,49}, {1,1,51}, {2,2,46}, {3,2,26}, {3,3,41} };
+	static const block_bit_t bits[6] = { 	{0,0,3}, {0,1,49}, {1,1,51}, {2,2,46}, {3,2,26}, {3,3,41} };
 
-	return last_Sbox_lookup_filter(P_perm_output, bit_offset, rows, 6, F_xor_res, logcat);
+	return last_Sbox_lookup_filter(P_perm_output, bit_offset, bits, 6, F_xor_res, logcat);
 }
 
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset)
+{
+	static const block_bit_t bits[6] = { 	{0,0,3}, {0,1,49}, {1,1,51}, {2,2,46}, {3,2,26}, {3,3,41} };
+
+	return xor_state_bits(state, bit_offset, bits, 6);
+}
 
 }//namespace ATTACK_U2
 

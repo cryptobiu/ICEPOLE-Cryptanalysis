@@ -129,10 +129,10 @@ void cryptanalysis()
 	prg.gen_rand_bytes(iv, KEY_SIZE);
 	log_buffer("Selected iv ", iv, KEY_SIZE, logcat, 700);
 
-	/*
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
 
+	/*
 	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
@@ -140,14 +140,15 @@ void cryptanalysis()
 	}
 	*/
 
-	ATTACK_U2::attack_u2_gen_test(logcat, key, iv, prg);
+	//ATTACK_U2::attack_u2_gen_test(logcat, key, iv, prg);
 
 	/*
-	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
+	*/
+	if(0 != ATTACK_U2::attack_u2_hack(logcat, key, iv, U[2], U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
 		return;
-	}*/
+	}
 
 	/*
 	if(0 != attack_u1(key, iv, U[1]))
