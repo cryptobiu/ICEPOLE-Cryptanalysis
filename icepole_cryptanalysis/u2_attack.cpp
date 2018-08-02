@@ -300,8 +300,7 @@ int generate_input_p1(const size_t bit_offset, u_int64_t P1[BLONG_SIZE], aes_prg
 	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
-	[0,4]=U0 , [1,0] , [2,0] , [3,0]
-	*/
+	[0,4]=U0 , [1,0] , [2,0] , [3,0]	*/
 	u_int64_t mask4 = left_rotate(0x0000000000000100, bit_offset);
 	if (mask4 == ( mask4 & ( init_state[0][4] ^ RC2I(P1xIS,1,0) ^ RC2I(P1xIS,2,0) ^ RC2I(P1xIS,3,0) ) ) )
 	{
@@ -313,12 +312,11 @@ int generate_input_p1(const size_t bit_offset, u_int64_t P1[BLONG_SIZE], aes_prg
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
-	[0,2] , [1,4] , [2,4] , [3,4]
-	*/
+	[0,2] , [1,3] , [2,3] , [3,3]	*/
 	u_int64_t mask5 = left_rotate(0x0000000000800000, bit_offset);
-	if (mask5 == ( mask5 & ( RC2I(P1xIS,0,2) ^ RC2I(P1xIS,1,4) ^ RC2I(P1xIS,2,4) ^ RC2I(P1xIS,3,4) ) ) )
+	if (mask5 == ( mask5 & ( RC2I(P1xIS,0,2) ^ RC2I(P1xIS,1,3) ^ RC2I(P1xIS,2,3) ^ RC2I(P1xIS,3,3) ) ) )
 	{
-		RC2I(P1,3,4) ^= mask5;
+		RC2I(P1,3,3) ^= mask5;
 	}
 
 	//set the 2nd block of P1 to zeroes
@@ -361,8 +359,11 @@ int attack_u2_gen_test(const char * logcat, const u_int8_t * key, const u_int8_t
 	u_int64_t init_state[4][5];
 	get_init_block(init_state, key, iv, logcat);
 
+	/*
 	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U1=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
 			__FUNCTION__, init_state[0][4],  init_state[1][4], init_state[2][4], init_state[3][4]);
+			*/
+	log_state("init_state", init_state, logcat, 500);
 
 	u_int64_t P1[2*BLONG_SIZE], P2[2*BLONG_SIZE];
 	for(size_t bit_offset = 0; bit_offset < 64; ++bit_offset)

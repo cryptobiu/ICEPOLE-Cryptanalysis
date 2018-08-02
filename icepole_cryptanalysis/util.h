@@ -49,3 +49,7 @@ static const size_t thread_count = 64;
 static const struct timeval _3sec = {3,0};
 static const time_t allotted_time = 28/*days*/ * 24/*hrs*/ * 60/*mins*/ * 60/*secs*/;
 
+u_int8_t get_block_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
+u_int8_t get_block_row_bits(const u_int64_t * P, const size_t x, const size_t z);
+bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
+

@@ -26,8 +26,6 @@ namespace ATTACK_U03
 int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
 int generate_input_p2(const size_t thd_id, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
-u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z);
-bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C);
 int bit_attack(const size_t bit_offset, const char * logcat,
 			   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
@@ -424,7 +422,7 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 		struct __row_t current_row = rows[i];
 		current_row.z = (current_row.z + id)%64;
 
-		row_bits = get_row_bits(P_perm_output, current_row.x, current_row.z);
+		row_bits = get_block_row_bits(P_perm_output, current_row.x, current_row.z);
 		input_bit = 0;
 
 		if(lookup_Sbox_input_bit(row_bits, current_row.y, input_bit))
@@ -434,162 +432,6 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 	}
 
 	return true;
-}
-
-u_int8_t get_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z)
-{
-	return (0 != (P[x + 4 * y] & (0x1UL << (z%64))))? 1: 0;
-}
-
-u_int8_t get_row_bits(const u_int64_t * P, const size_t x, const size_t z)
-{
-	return (
-			(get_bit(P, x, 0, z)	 )	|
-			(get_bit(P, x, 1, z) << 1)	|
-			(get_bit(P, x, 2, z) << 2)	|
-			(get_bit(P, x, 3, z) << 3)
-			);
-}
-
-bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit)
-{
-	switch(output_row_bits)
-	{
-	case 0x0://in doc
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 1; return true;
-		case 2: input_bit = 1; return true;
-		case 4: input_bit = 1; return true;
-		default: return false;
-		}
-		break;
-	case 0x1://1000
-		return false;
-	case 0x2://0100
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 0; return true;
-		case 1: input_bit = 1; return true;
-		case 3: input_bit = 0; return true;
-		default: return false;
-		}
-		break;
-	case 0x3://1100
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 1; return true;
-		default: return false;
-		}
-		break;
-	case 0x4://0010
-		switch(input_bit_index)
-		{
-		case 1: input_bit = 0; return true;
-		default: return false;
-		}
-		break;
-	case 0x5://1010
-		switch(input_bit_index)
-		{
-		case 1: input_bit = 0; return true;
-		case 3: input_bit = 0; return true;
-		default: return false;
-		}
-		break;
-	case 0x6://0110
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 0; return true;
-		case 1: input_bit = 1; return true;
-		case 3: input_bit = 0; return true;
-		default: return false;
-		}
-		break;
-	case 0x7://1110
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 1; return true;
-		case 1: input_bit = 1; return true;
-		default: return false;
-		}
-		break;
-	case 0x8://0001
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 0; return true;
-		case 1: input_bit = 1; return true;
-		case 2: input_bit = 0; return true;
-		case 3: input_bit = 1; return true;
-		default: return false;
-		}
-		break;
-	case 0x9://1001
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 1; return true;
-		case 2: input_bit = 0; return true;
-		default: return false;
-		}
-		break;
-	case 0xA://0101
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 0; return true;
-		case 1: input_bit = 0; return true;
-		case 2: input_bit = 0; return true;
-		case 3: input_bit = 1; return true;
-		default: return false;
-		}
-		break;
-	case 0xB://1101
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 1; return true;
-		case 2: input_bit = 0; return true;
-		default: return false;
-		}
-		break;
-	case 0xC://0011
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 1; return true;
-		case 1: input_bit = 0; return true;
-		case 2: input_bit = 1; return true;
-		default: return false;
-		}
-		break;
-	case 0xD://1011
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 0; return true;
-		case 1: input_bit = 0; return true;
-		case 2: input_bit = 1; return true;
-		case 3: input_bit = 1; return true;
-		default: return false;
-		}
-		break;
-	case 0xE://0111
-		switch(input_bit_index)
-		{
-		case 0: input_bit = 0; return true;
-		case 1: input_bit = 1; return true;
-		case 2: input_bit = 1; return true;
-		case 3: input_bit = 1; return true;
-		default: return false;
-		}
-		break;
-	case 0xF://1111
-		switch(input_bit_index)
-		{
-		case 3: input_bit = 0; return true;
-		case 4: input_bit = 0; return true;
-		default: return false;
-		}
-		break;
-	default: return false;
-	}
-	return false;
 }
 
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C)
