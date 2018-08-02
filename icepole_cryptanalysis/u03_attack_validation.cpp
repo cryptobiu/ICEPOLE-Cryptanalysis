@@ -9,6 +9,7 @@
 
 #include "util.h"
 
+/*
 void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64_t init_state[4][5], const char * logcat)
 {
 	for(int i = 0; i < 4; ++i)
@@ -25,7 +26,7 @@ void validate_init_state(const u_int64_t * P, const u_int64_t * C, const u_int64
 			}
 		}
 	}
-}
+}*/
 
 int validate_generated_input_1st_constraint(const size_t thd_id, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
 {

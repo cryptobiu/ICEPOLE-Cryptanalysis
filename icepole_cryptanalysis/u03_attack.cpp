@@ -46,7 +46,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	snprintf(locat, 32, "%s.u03", logcat);
 
 	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv);
+	get_init_block(init_state, key, iv, logcat);
 
 	std::vector<attacker_t> atckr_prms(thread_count);
 
@@ -312,7 +312,7 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	u_int64_t P1xIS[BLONG_SIZE];
 	for(size_t i = 0; i < 4; ++i)
 		for(size_t j = 0; j < 4; ++j)
-			RC2I(P1xIS,i,j) = RC2I(P1,i,j) ^ init_state[i][j], thd_id;
+			RC2I(P1xIS,i,j) = RC2I(P1,i,j) ^ init_state[i][j];
 
 	{	/* set 1st constraint
 		const u_int64_t u03_P1_1st_constraint[16] =

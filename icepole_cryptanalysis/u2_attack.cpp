@@ -41,7 +41,9 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 	snprintf(locat, 32, "%s.u2", logcat);
 
 	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv);
+	get_init_block(init_state, key, iv, logcat);
+	init_state[0][4] = U0;
+	init_state[3][4] = U3;
 
 	std::vector<attacker_t> atckr_prms(thread_count);
 
@@ -215,9 +217,10 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, cons
 }
 
 int bit_attack(const size_t bit_offset, const char * logcat,
-				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-				   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+			   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+			   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
 {
+	/**/
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
 	u_int8_t F1 = 0, F2 = 0;
@@ -242,6 +245,44 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 		}
 	}
 	return 0;
+}
+
+int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat)
+{
+	//Generation of random bytes in P1
+	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
+
+	//XOR of P1 with the icepole init state into P1xIS
+	u_int64_t P1xIS[BLONG_SIZE];
+	for(size_t i = 0; i < 4; ++i)
+		for(size_t j = 0; j < 4; ++j)
+			RC2I(P1xIS,i,j) = RC2I(P1,i,j) ^ init_state[i][j];
+
+	/*	1st constraint: xor of the bits of this mask should be equal to 1
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L,0x0000000000000000L
+	[0,3] , [1,3] , [3,2]		 */
+	u_int64_t mask1 = left_rotate(0x0000000008000000, thd_id);
+	if (0 == ( mask1 & ( RC2I(P1xIS,0,3) ^ RC2I(P1xIS,1,3) ^ RC2I(P1xIS,3,2) ) ) )
+	{
+		RC2I(P1,3,2) ^= mask1;
+	}
+
+	/* 2nd constraint: xor of the bits of this mask should be equal to 1
+	0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000020000L,0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	[0,1] , [1,0] , [1,2] , [2,0] , [3,1]	 */
+	u_int64_t mask2 = left_rotate(0x0000000000020000, thd_id);
+	if (0 == ( mask2 & ( RC2I(P1xIS,0,1) ^ RC2I(P1xIS,1,0) ^ RC2I(P1xIS,1,2) ^ RC2I(P1xIS,2,0) ^ RC2I(P1xIS,3,1) ) ) )
+	{
+		RC2I(P1,3,2) ^= mask2;
+	}
+
+	#error 'here'
 }
 
 }
