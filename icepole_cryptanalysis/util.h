@@ -53,3 +53,11 @@ u_int8_t get_block_bit(const u_int64_t * P, const size_t x, const size_t y, cons
 u_int8_t get_block_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 
+typedef struct
+{
+	size_t x, y, z;
+}row_t;
+
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset,
+							 const row_t * rows, const size_t row_count,
+							 u_int8_t & F_xor_res, const char * logcat);

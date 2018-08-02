@@ -378,6 +378,39 @@ int attack_u2_gen_test(const char * logcat, const u_int8_t * key, const u_int8_t
 	}
 }
 
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset, u_int8_t & F_xor_res, const char * logcat)
+{
+	/* This is the Omega mask for thread with bit_offset=0; for all others shift by bit_offset must be applied to z
+	const u_int64_t omega_mask[16] =
+	{
+		0x0000000000000008L,0x0002000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+		0x0000000000000000L,0x0008000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+		0x0000000000000000L,0x0000000000000000L,0x0000400000000000L,0x0000000000000000L,0x0000000000000000L
+		0x0000000000000000L,0x0000000000000000L,0x0000000004000000L,0x0000020000000000L,0x0000000000000000L
+	};
+	[0][0][3]
+	[0][1][49]
+	[1][1][51]
+	[2][2][46]
+	[3][2][26]
+	[3][3][41]
+	*/
+
+	static const row_t rows[6] = { 	{0,0,3}, {0,1,49}, {1,1,51}, {2,2,46}, {3,2,26}, {3,3,41} };
+
+	return last_Sbox_lookup_filter(P_perm_output, bit_offset, rows, 6, F_xor_res, logcat);
+}
+
 
 }//namespace ATTACK_U2
+
+
+
+
+
+
+
+
+
+
 

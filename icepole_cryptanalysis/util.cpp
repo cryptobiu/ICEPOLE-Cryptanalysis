@@ -347,3 +347,26 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 	return false;
 }
 
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset,
+							 const row_t * rows, const size_t row_count,
+							 u_int8_t & F_xor_res, const char * logcat)
+{
+	u_int8_t row_bits, input_bit;
+	F_xor_res = 0;
+
+	for(size_t i = 0; i < row_count; ++i)
+	{
+		row_t current_row = rows[i];
+		current_row.z = (current_row.z + bit_offset)%64;
+
+		row_bits = get_block_row_bits(P_perm_output, current_row.x, current_row.z);
+		input_bit = 0;
+
+		if(lookup_Sbox_input_bit(row_bits, current_row.y, input_bit))
+			F_xor_res ^= input_bit;
+		else
+			return false;
+	}
+	return true;
+}
+

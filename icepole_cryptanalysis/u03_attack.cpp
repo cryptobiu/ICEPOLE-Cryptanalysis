@@ -391,9 +391,9 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	return 0;
 }
 
-bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat)
+bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset, u_int8_t & F_xor_res, const char * logcat)
 {
-	/* This is the Omega mask for thread with id=0; for all others shift by id must be applied to z
+	/* This is the Omega mask for thread with bit_offset=0; for all others shift by bit_offset must be applied to z
 	const u_int64_t omega_mask[16] =
 	{
 		0x0008000000000000, 0x0000000200000000, 0x0000000000000000, 0x0000000000001000, //0x0000000000000000,
@@ -409,29 +409,12 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u
 	[2][2][30]
 	[3][2][10]
 	[3][3][25]
-	 */
+	*/
 
-	static const struct __row_t { size_t x; size_t y; size_t z; } rows[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
-																				{2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
+	static const row_t rows[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
+									{2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
 
-	u_int8_t row_bits, input_bit;
-	F_xor_res = 0;
-
-	for(size_t i = 0; i < 8; ++i)
-	{
-		struct __row_t current_row = rows[i];
-		current_row.z = (current_row.z + id)%64;
-
-		row_bits = get_block_row_bits(P_perm_output, current_row.x, current_row.z);
-		input_bit = 0;
-
-		if(lookup_Sbox_input_bit(row_bits, current_row.y, input_bit))
-			F_xor_res ^= input_bit;
-		else
-			return false;
-	}
-
-	return true;
+	return last_Sbox_lookup_filter(P_perm_output, bit_offset, rows, 8, F_xor_res, logcat);
 }
 
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C)
