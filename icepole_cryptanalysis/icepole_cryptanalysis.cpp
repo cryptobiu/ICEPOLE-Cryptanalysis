@@ -116,18 +116,19 @@ void init_log(const char * a_log_file, const char * a_log_dir, const int log_lev
 void cryptanalysis()
 {
 	u_int8_t key[KEY_SIZE], iv[KEY_SIZE];
+
+	aes_prg prg;
+	if(0 != prg.init(BLOCK_SIZE))
 	{
-		aes_prg prg;
-		if(0 != prg.init(BLOCK_SIZE))
-		{
-			log4cpp::Category::getInstance(logcat).error("%s: prg.init() failure", __FUNCTION__);
-			return;
-		}
-		prg.gen_rand_bytes(key, KEY_SIZE);
-		log_buffer("Selected key", key, KEY_SIZE, logcat, 700);
-		prg.gen_rand_bytes(iv, KEY_SIZE);
-		log_buffer("Selected iv ", iv, KEY_SIZE, logcat, 700);
+		log4cpp::Category::getInstance(logcat).error("%s: prg.init() failure", __FUNCTION__);
+		return;
 	}
+
+	prg.gen_rand_bytes(key, KEY_SIZE);
+	log_buffer("Selected key", key, KEY_SIZE, logcat, 700);
+	prg.gen_rand_bytes(iv, KEY_SIZE);
+	log_buffer("Selected iv ", iv, KEY_SIZE, logcat, 700);
+
 
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
@@ -137,6 +138,9 @@ void cryptanalysis()
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
 		return;
 	}
+	/*	*/
+
+	//ATTACK_U2::attack_u2_gen_test(logcat, key, iv, prg);
 
 	/*
 	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))

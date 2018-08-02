@@ -29,8 +29,8 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 int bit_attack_check(const size_t bit_offset, const char * logcat,
 				   	 const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 					 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
-int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
-int generate_input_p2(const size_t thd_id, u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
+int generate_input_p1(const size_t bit_offset, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
+int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 
 int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U2, const u_int64_t & U0, const u_int64_t & U3)
@@ -231,6 +231,7 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C+BLONG_SIZE));
 
+	/*
 	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
 	{
 		generate_input_p2(bit_offset, P1, P2, logcat);
@@ -243,11 +244,11 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 			if(F1 == F2)
 				ctr_2[0]++;
 		}
-	}
+	}*/
 	return 0;
 }
 
-int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat)
+int generate_input_p1(const size_t bit_offset, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat)
 {
 	//Generation of random bytes in P1
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
@@ -264,7 +265,7 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L,0x0000000000000000L
 	[0,3] , [1,3] , [3,2]		 */
-	u_int64_t mask1 = left_rotate(0x0000000008000000, thd_id);
+	u_int64_t mask1 = left_rotate(0x0000000008000000, bit_offset);
 	if (0 == ( mask1 & ( RC2I(P1xIS,0,3) ^ RC2I(P1xIS,1,3) ^ RC2I(P1xIS,3,2) ) ) )
 	{
 		RC2I(P1,3,2) ^= mask1;
@@ -276,7 +277,7 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	[0,1] , [1,0] , [1,2] , [2,0] , [3,1]	 */
-	u_int64_t mask2 = left_rotate(0x0000000000020000, thd_id);
+	u_int64_t mask2 = left_rotate(0x0000000000020000, bit_offset);
 	if (0 == ( mask2 & ( RC2I(P1xIS,0,1) ^ RC2I(P1xIS,1,0) ^ RC2I(P1xIS,1,2) ^ RC2I(P1xIS,2,0) ^ RC2I(P1xIS,3,1) ) ) )
 	{
 		RC2I(P1,3,1) ^= mask2;
@@ -288,7 +289,7 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	0x0000000000000000L,0x0400000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0400000000000000L,0x0000000000000000L,0x0400000000000000L,0x0000000000000000L,0x0000000000000000L
 	[0,1] , [1,0] , [2,1] , [3,0] , [3,2]	 */
-	u_int64_t mask3 = left_rotate(0x0400000000000000, thd_id);
+	u_int64_t mask3 = left_rotate(0x0400000000000000, bit_offset);
 	if (0 == ( mask3 & ( RC2I(P1xIS,0,1) ^ RC2I(P1xIS,1,0) ^ RC2I(P1xIS,2,1) ^ RC2I(P1xIS,3,0) ^ RC2I(P1xIS,3,2) ) ) )
 	{
 		RC2I(P1,3,2) ^= mask3;
@@ -301,7 +302,7 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	[0,4]=U0 , [1,0] , [2,0] , [3,0]
 	*/
-	u_int64_t mask4 = left_rotate(0x0000000000000100, thd_id);
+	u_int64_t mask4 = left_rotate(0x0000000000000100, bit_offset);
 	if (mask4 == ( mask4 & ( init_state[0][4] ^ RC2I(P1xIS,1,0) ^ RC2I(P1xIS,2,0) ^ RC2I(P1xIS,3,0) ) ) )
 	{
 		RC2I(P1,3,0) ^= mask4;
@@ -314,7 +315,7 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
 	[0,2] , [1,4] , [2,4] , [3,4]
 	*/
-	u_int64_t mask5 = left_rotate(0x0000000000800000, thd_id);
+	u_int64_t mask5 = left_rotate(0x0000000000800000, bit_offset);
 	if (mask5 == ( mask5 & ( RC2I(P1xIS,0,2) ^ RC2I(P1xIS,1,4) ^ RC2I(P1xIS,2,4) ^ RC2I(P1xIS,3,4) ) ) )
 	{
 		RC2I(P1,3,4) ^= mask5;
@@ -325,4 +326,57 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	return 0;
 }
 
+int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat)
+{
+	/* Diff: P1 ^ P2 = the following map -
+	0x0000000000000000L,0x0040000000000000L,0x0000000000000000L,0x0040000000000000L,0x0000000000000000L
+	0x0040000000000000L,0x0040000000000000L,0x0000000000000000L,0x0040000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0040000000000000L,0x0040000000000000L,0x0040000000000000L,0x0000000000000000L
+	0x0040000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	*/
+
+	u_int64_t mask = left_rotate(0x0040000000000000, bit_offset);
+
+	//copy P1 onto P2 and modify the bits by the conversion mask
+	memcpy(P2, P1, 2 * BLOCK_SIZE);
+	RC2I(P2,0,1) ^= mask;
+	RC2I(P2,0,3) ^= mask;
+	RC2I(P2,1,0) ^= mask;
+	RC2I(P2,1,1) ^= mask;
+	RC2I(P2,1,3) ^= mask;
+	RC2I(P2,2,1) ^= mask;
+	RC2I(P2,2,2) ^= mask;
+	RC2I(P2,2,3) ^= mask;
+	RC2I(P2,3,0) ^= mask;
+	return 0;
 }
+
+int attack_u2_gen_test(const char * logcat, const u_int8_t * key, const u_int8_t * iv, aes_prg & prg)
+{
+	int result = -1;
+
+	char locat[32];
+	snprintf(locat, 32, "%s.u2", logcat);
+
+	u_int64_t init_state[4][5];
+	get_init_block(init_state, key, iv, logcat);
+
+	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U1=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
+			__FUNCTION__, init_state[0][4],  init_state[1][4], init_state[2][4], init_state[3][4]);
+
+	u_int64_t P1[2*BLONG_SIZE], P2[2*BLONG_SIZE];
+	for(size_t bit_offset = 0; bit_offset < 64; ++bit_offset)
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: bit_offset = %lu.", __FUNCTION__, bit_offset);
+
+		generate_input_p1(bit_offset, P1, prg, init_state, logcat);
+		log_block("P1", P1, logcat, 500);
+
+		generate_input_p2(bit_offset, P1, P2, logcat);
+		log_block("P2", P2, logcat, 500);
+	}
+}
+
+
+}//namespace ATTACK_U2
+
