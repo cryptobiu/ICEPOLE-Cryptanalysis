@@ -20,6 +20,7 @@ set(SOURCE_FILES
 	u03_attack.cpp
 	u03_attack_validation.cpp
 	u2_attack.cpp
+	u1_attack.cpp
 	util.cpp
 )
 

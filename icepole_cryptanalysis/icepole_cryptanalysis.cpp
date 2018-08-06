@@ -29,6 +29,7 @@
 
 #include "u03_attack.h"
 #include "u2_attack.h"
+#include "u1_attack.h"
 
 void get_options(int argc, char *argv[], int * log_level);
 void show_usage(const char * prog);
@@ -141,9 +142,7 @@ void cryptanalysis()
 	*/
 
 	/*
-	*/
-
-	//provide U0, U3 instead of the above U03 attack
+	//provide U0 and U3 instead of the above U03 attack
 	u_int64_t init_state[4][5];
 	get_init_block(init_state, key, iv, logcat);
 
@@ -152,13 +151,17 @@ void cryptanalysis()
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
 		return;
 	}
+	*/
 
-	/*
-	if(0 != attack_u1(key, iv, U[1]))
+	/**/
+	//provide U0, U2 and U3 instead of the above U03 and U2 attacks
+	u_int64_t init_state[4][5];
+	get_init_block(init_state, key, iv, logcat);
+	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], init_state[0][4], init_state[2][4], init_state[3][4]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
 		return;
-	}*/
+	}
 
 	/*
 	log4cpp::Category::getInstance(logcat).notice("%s: attack done; U0=0x%016lX; U1=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
