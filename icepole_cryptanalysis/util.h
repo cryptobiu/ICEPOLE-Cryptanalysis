@@ -62,4 +62,20 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 							 const block_bit_t * bits, const size_t bit_count,
 							 u_int8_t & F_xor_res, const char * logcat);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count);
-u_int8_t u12_xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
+//u_int8_t u12_xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
+//bool u12_last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset, u_int8_t & F_xor_res, const char * logcat);
+/* This is the Omega mask for thread with bit_offset=0; for all others shift by bit_offset must be applied to z
+omega_mask:
+0x0000000000000008L,0x0002000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+0x0000000000000000L,0x0008000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+0x0000000000000000L,0x0000000000000000L,0x0000400000000000L,0x0000000000000000L,0x0000000000000000L
+0x0000000000000000L,0x0000000000000000L,0x0000000004000000L,0x0000020000000000L,0x0000000000000000L
+[0][0][3]
+[0][1][49]
+[1][1][51]
+[2][2][46]
+[3][2][26]
+[3][3][41]
+*/
+static const block_bit_t u12_omega_bits[6] = { {0,0,3}, {0,1,49}, {1,1,51}, {2,2,46}, {3,2,26}, {3,3,41} };
+

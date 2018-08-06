@@ -133,6 +133,12 @@ void cryptanalysis()
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
 
+	//provide U0, U2 and U3 instead of the above U03 and U2 attacks
+	u_int64_t init_state[4][5];
+	get_init_block(init_state, key, iv, logcat);//U0 must be XORed with 3 to revert the 2 padding bits
+	U[0] = init_state[0][4] ^ 3;
+	U[3] = init_state[3][4];
+
 	/*
 	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, U[0], U[3]))
 	{
@@ -141,24 +147,18 @@ void cryptanalysis()
 	}
 	*/
 
-	/*
-	//provide U0 and U3 instead of the above U03 attack
-	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv, logcat);
-
-	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], init_state[0][4], init_state[3][4]))
+	/**/
+	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
 		return;
 	}
-	*/
+
+	U[2] = init_state[2][4];
 
 	/**/
-	//provide U0, U2 and U3 instead of the above U03 and U2 attacks
-	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv, logcat);//U0 must be XORed with 3 to revert the 2 padding bits
-	//if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], init_state[0][4] ^ 3, init_state[2][4], init_state[3][4]))
-	if(0 != ATTACK_U1::attack_u1_gen_test(logcat, key, iv, prg))
+	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
+		//if(0 != ATTACK_U1::attack_u1_gen_test(logcat, key, iv, prg))
 	{
 		//log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u1_gen_test() failure.", __FUNCTION__);
