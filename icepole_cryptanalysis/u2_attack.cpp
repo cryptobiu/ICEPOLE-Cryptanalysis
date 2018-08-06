@@ -34,7 +34,6 @@ int bit_attack_hack(const size_t bit_offset, const char * logcat,
 int generate_input_p1(const size_t bit_offset, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
 int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
-u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
 
 int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U2, const u_int64_t & U0, const u_int64_t & U3)
 {
@@ -284,7 +283,7 @@ int bit_attack_check(const size_t bit_offset, const char * logcat,
 
 			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-			u_int8_t hF1 = xor_state_bits(x_state, bit_offset);
+			u_int8_t hF1 = u12_xor_state_bits(x_state, bit_offset);
 
 			if(hF1 != F1)
 			{
@@ -298,7 +297,7 @@ int bit_attack_check(const size_t bit_offset, const char * logcat,
 
 			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-			u_int8_t hF2 = xor_state_bits(x_state, bit_offset);
+			u_int8_t hF2 = u12_xor_state_bits(x_state, bit_offset);
 
 			if(hF2 != F2)
 			{
@@ -327,12 +326,12 @@ int bit_attack_hack(const size_t bit_offset, const char * logcat,
 	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-	F1 = xor_state_bits(x_state, bit_offset);
+	F1 = u12_xor_state_bits(x_state, bit_offset);
 
 	generate_input_p2(bit_offset, P1, P2, logcat);
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-	F2 = xor_state_bits(x_state, bit_offset);
+	F2 = u12_xor_state_bits(x_state, bit_offset);
 
 	ctr_1[0]++;
 	if(F1 == F2)
@@ -463,13 +462,6 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 	static const block_bit_t bits[6] = { 	{0,0,3}, {0,1,49}, {1,1,51}, {2,2,46}, {3,2,26}, {3,3,41} };
 
 	return last_Sbox_lookup_filter(P_perm_output, bit_offset, bits, 6, F_xor_res, logcat);
-}
-
-u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset)
-{
-	static const block_bit_t bits[6] = { 	{0,0,3}, {0,1,49}, {1,1,51}, {2,2,46}, {3,2,26}, {3,3,41} };
-
-	return xor_state_bits(state, bit_offset, bits, 6);
 }
 
 }//namespace ATTACK_U2
