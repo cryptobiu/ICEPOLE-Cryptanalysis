@@ -140,11 +140,14 @@ void cryptanalysis()
 	}
 	*/
 
-	//ATTACK_U2::attack_u2_gen_test(logcat, key, iv, prg);
-
 	/*
 	*/
-	if(0 != ATTACK_U2::attack_u2_hack(logcat, key, iv, U[2], U[0], U[3]))
+
+	//provide U0, U3 instead of the above U03 attack
+	u_int64_t init_state[4][5];
+	get_init_block(init_state, key, iv, logcat);
+
+	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], init_state[0][4], init_state[3][4]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
 		return;
