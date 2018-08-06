@@ -156,8 +156,8 @@ void cryptanalysis()
 	/**/
 	//provide U0, U2 and U3 instead of the above U03 and U2 attacks
 	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv, logcat);
-	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], init_state[0][4], init_state[2][4], init_state[3][4]))
+	get_init_block(init_state, key, iv, logcat);//U0 must be XORed with 3 to revert the 2 padding bits
+	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], init_state[0][4] ^ 3, init_state[2][4], init_state[3][4]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
 		return;

@@ -14,9 +14,8 @@
 #include <event2/event.h>
 #include <log4cpp/Category.hh>
 
-#include "aes_prg.h"
 #include "icepole128av2/ref/encrypt.h"
-
+#include "aes_prg.h"
 #include "util.h"
 
 namespace ATTACK_U2
@@ -52,8 +51,6 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 	std::vector<attacker_t> atckr_prms(thread_count);
 
 	log4cpp::Category::getInstance(logcat).notice("%s: Provided: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, U0, U3);
-	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
-			__FUNCTION__, init_state[0][4], init_state[2][4], init_state[3][4]);
 
 	sem_t run_flag;
 	if(0 == sem_init(&run_flag, 0, 1))

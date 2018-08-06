@@ -48,7 +48,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 
 	std::vector<attacker_t> atckr_prms(thread_count);
 
-	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, init_state[0][4], init_state[3][4]);
+	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, init_state[0][4], init_state[3][4] ^ 3);
 
 	sem_t run_flag;
 	if(0 == sem_init(&run_flag, 0, 1))
@@ -140,7 +140,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 							guess_work(atckr_prms, U0, U3, locat);
 
 							log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U0);
-							log4cpp::Category::getInstance(logcat).notice("%s: actual  U0 = 0x%016lX.", __FUNCTION__, init_state[0][4]);
+							log4cpp::Category::getInstance(logcat).notice("%s: actual  U0 = 0x%016lX.", __FUNCTION__, init_state[0][4] ^ 3);
 							log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U3);
 							log4cpp::Category::getInstance(logcat).notice("%s: actual  U3 = 0x%016lX.", __FUNCTION__, init_state[3][4]);
 
@@ -153,7 +153,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 							}
 
 							{
-								u_int64_t u0cmp = ~(U0 ^ init_state[0][4]);
+								u_int64_t u0cmp = ~(U0 ^ (init_state[0][4] ^ 3));
 								size_t eq_bit_cnt = 0;
 								for(u_int64_t m = 0x1; m != 0; m <<= 1)
 									if(m & u0cmp) eq_bit_cnt++;
