@@ -16,6 +16,7 @@
 #include "icepole128av2/ref/encrypt.h"
 #include "aes_prg.h"
 #include "util.h"
+#include "attack_validation.h"
 
 namespace ATTACK_U1
 {
@@ -426,7 +427,7 @@ int generate_input_p1(const size_t bit_offset, u_int64_t P1[BLONG_SIZE], aes_prg
 	u_int64_t mask6 = left_rotate(0x2000000000, bit_offset);
 	if (0 != ( mask6 & ( RC2I(P1xIS,0,0) ^ RC2I(P1xIS,1,1) ^ init_state[2][4] ^ RC2I(P1xIS,3,0) ) ) )
 	{
-		RC2I(P1xIS,0,0) ^= mask6;
+		RC2I(P1,0,0) ^= mask6;
 	}
 	//=================================================================================================
 
@@ -478,9 +479,11 @@ int attack_u1_gen_test(const char * logcat, const u_int8_t * key, const u_int8_t
 
 		generate_input_p1(bit_offset, P1, prg, init_state, logcat);
 		log_block("P1", P1, logcat, 500);
+		U1::validate_generated_input_1(bit_offset, P1, init_state, logcat);
 
 		generate_input_p2(bit_offset, P1, P2, logcat);
 		log_block("P2", P2, logcat, 500);
+		U1::validate_generated_input_2(bit_offset, P1, P2, logcat);
 	}
 }
 

@@ -16,9 +16,9 @@ link_directories(
 
 set(SOURCE_FILES
 	aes_prg.cpp
+	attack_validation.cpp
 	icepole_cryptanalysis.cpp
 	u03_attack.cpp
-	u03_attack_validation.cpp
 	u2_attack.cpp
 	u1_attack.cpp
 	util.cpp

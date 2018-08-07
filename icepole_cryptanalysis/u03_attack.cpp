@@ -15,10 +15,10 @@
 #include <log4cpp/Category.hh>
 
 #include "aes_prg.h"
+#include "attack_validation.h"
 #include "icepole128av2/ref/encrypt.h"
 
 #include "util.h"
-#include "u03_attack_validation.h"
 
 namespace ATTACK_U03
 {
