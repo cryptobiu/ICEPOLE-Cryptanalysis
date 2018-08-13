@@ -139,6 +139,7 @@ void cryptanalysis()
 		return;
 	}
 
+	/*
 	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
@@ -153,5 +154,6 @@ void cryptanalysis()
 
 	log4cpp::Category::getInstance(logcat).notice("%s: attack done; U0=0x%016lX; U1=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
 													__FUNCTION__, U[0], U[1], U[2], U[3]);
+	*/
 }
 
