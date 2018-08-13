@@ -25,7 +25,6 @@ namespace ATTACK_U03
 
 int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
 int generate_input_p2(const size_t thd_id, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
-bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t id, u_int8_t & F_xor_res, const char * logcat);
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C);
 int bit_attack(const size_t bit_offset, const char * logcat,
 			   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
@@ -33,8 +32,30 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 int bit_attack_check(const size_t bit_offset, const char * logcat,
 				   	 const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
 					 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
+int bit_attack_hack(const size_t bit_offset, const char * logcat,
+				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4]);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
-u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset);
+
+/* This is the U03 Omega mask for thread with bit_offset=0; for all others shift by bit_offset must be applied to z
+const u_int64_t omega_mask[16] =
+{
+	0x0008000000000000, 0x0000000200000000, 0x0000000000000000, 0x0000000000001000, //0x0000000000000000,
+	0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000000000000, 0x0040000000000000, 0x0000000040000000, 0x0000000000000000, //0x0000000000000000,
+	0x0000000000000000, 0x0000000000000000, 0x0000000000000400, 0x0000000002000000, //0x0000000000000000,
+};
+[0][0][51]
+[0][1][33]
+[0][3][12]
+[1][1][35]
+[2][1][54]
+[2][2][30]
+[3][2][10]
+[3][3][25]
+*/
+static const block_bit_t u3_omega_bits[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
+											{2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
 
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3)
 {
@@ -96,8 +117,10 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
 								atckr_prms[i].attacks_done = 0;
-								atckr_prms[i].required_attacks = pow(2, 33.9) + 1;
-								atckr_prms[i].bit_attack = bit_attack;//bit_attack_check;
+								atckr_prms[i].required_attacks = pow(2, 20);
+								//atckr_prms[i].bit_attack = bit_attack;
+								//atckr_prms[i].bit_attack = bit_attack_check;
+								atckr_prms[i].bit_attack = bit_attack_hack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -224,14 +247,14 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C+BLONG_SIZE));
 
-	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
+	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, u3_omega_bits, 8, F1, logcat))
 	{
 		size_t n = lookup_counter_bits(bit_offset, C);
 		generate_input_p2(bit_offset, P1, P2, logcat);
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 		kappa5((unsigned char *)(C+BLONG_SIZE));
-		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
+		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, u3_omega_bits, 8, F2, logcat))
 		{
 			ctr_1[n]++;
 			if(F1 == F2)
@@ -255,14 +278,14 @@ int bit_attack_check(const size_t bit_offset, const char * logcat,
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C+BLONG_SIZE));
 
-	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F1, logcat))
+	if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, u3_omega_bits, 8, F1, logcat))
 	{
 		size_t n = lookup_counter_bits(bit_offset, C);
 		generate_input_p2(bit_offset, P1, P2, logcat);
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 		kappa5((unsigned char *)(C+BLONG_SIZE));
-		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, F2, logcat))
+		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit_offset, u3_omega_bits, 8, F2, logcat))
 		{
 			ctr_1[n]++;
 			if(F1 == F2)
@@ -270,7 +293,7 @@ int bit_attack_check(const size_t bit_offset, const char * logcat,
 
 			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-			u_int8_t hF1 = xor_state_bits(x_state, bit_offset);
+			u_int8_t hF1 = xor_state_bits(x_state, bit_offset, u3_omega_bits, 8);
 
 			if(hF1 != F1)
 			{
@@ -284,7 +307,7 @@ int bit_attack_check(const size_t bit_offset, const char * logcat,
 
 			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
-			u_int8_t hF2 = xor_state_bits(x_state, bit_offset);
+			u_int8_t hF2 = xor_state_bits(x_state, bit_offset, u3_omega_bits, 8);
 
 			if(hF2 != F2)
 			{
@@ -298,6 +321,34 @@ int bit_attack_check(const size_t bit_offset, const char * logcat,
 			}
 		}
 	}
+	return 0;
+}
+
+int bit_attack_hack(const size_t bit_offset, const char * logcat,
+				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen;
+	u_int8_t F1 = 0, F2 = 0;
+	u_int64_t x_state[4][5];
+
+	generate_input_p1(bit_offset, P1, prg, init_state, logcat);
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+	F1 = xor_state_bits(x_state, bit_offset, u3_omega_bits, 8);
+
+	size_t n = lookup_counter_bits(bit_offset, C);
+
+	generate_input_p2(bit_offset, P1, P2, logcat);
+	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+	F2 = xor_state_bits(x_state, bit_offset, u3_omega_bits, 8);
+
+	ctr_1[n]++;
+	if(F1 == F2)
+		ctr_2[n]++;
+
 	return 0;
 }
 
@@ -389,40 +440,6 @@ int generate_input_p1(const size_t thd_id, u_int64_t P1[BLONG_SIZE], aes_prg & p
 	//set the 2nd block of P1 to zeroes
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
 	return 0;
-}
-
-bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset, u_int8_t & F_xor_res, const char * logcat)
-{
-	/* This is the Omega mask for thread with bit_offset=0; for all others shift by bit_offset must be applied to z
-	const u_int64_t omega_mask[16] =
-	{
-		0x0008000000000000, 0x0000000200000000, 0x0000000000000000, 0x0000000000001000, //0x0000000000000000,
-		0x0000000000000000, 0x0000000800000000, 0x0000000000000000, 0x0000000000000000, //0x0000000000000000,
-		0x0000000000000000, 0x0040000000000000, 0x0000000040000000, 0x0000000000000000, //0x0000000000000000,
-		0x0000000000000000, 0x0000000000000000, 0x0000000000000400, 0x0000000002000000, //0x0000000000000000,
-	};
-	[0][0][51]
-	[0][1][33]
-	[0][3][12]
-	[1][1][35]
-	[2][1][54]
-	[2][2][30]
-	[3][2][10]
-	[3][3][25]
-	*/
-
-	static const block_bit_t bits[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
-											{2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
-
-	return last_Sbox_lookup_filter(P_perm_output, bit_offset, bits, 8, F_xor_res, logcat);
-}
-
-u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset)
-{
-	static const block_bit_t bits[8] = { {0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
-										 {2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
-
-	return xor_state_bits(state, bit_offset, bits, 8);
 }
 
 size_t lookup_counter_bits(const size_t thd_id, const u_int64_t * C)
