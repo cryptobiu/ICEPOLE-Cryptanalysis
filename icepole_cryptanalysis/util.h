@@ -62,3 +62,37 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 							 const block_bit_t * bits, const size_t bit_count,
 							 u_int8_t & F_xor_res, const char * logcat);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count);
+
+//*************************************************************************************************//
+
+typedef struct
+{
+	u_int64_t ctr_1[4], ctr_2[4];
+}attacker_ctrs_t;
+
+typedef struct
+{
+	size_t id;
+	std::string logcat;
+	sem_t * run_flag;
+	u_int8_t * key, * iv;
+	u_int64_t init_state[4][5];
+	attacker_ctrs_t ctrs[64];
+	size_t required_attacks, attacks_done;
+
+	int (*bit_attack)(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
+				   	  const u_int64_t init_state[4][5], aes_prg & prg, attacker_ctrs_t ctrs[64]);
+
+}sym_attacker_t;
+
+void * sym_attacker(void * arg);
+
+typedef struct
+{
+	struct event_base * the_base;
+	std::string locat;
+	std::vector<sym_attacker_t> * atckr_prms;
+	time_t start_time;
+}sym_event_param_t;
+
+void sym_sigint_cb(evutil_socket_t, short, void * arg);

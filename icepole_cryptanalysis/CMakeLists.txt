@@ -19,6 +19,7 @@ set(SOURCE_FILES
 	attack_validation.cpp
 	icepole_cryptanalysis.cpp
 	u03_attack.cpp
+	u03_sym_attack.cpp
 	u2_attack.cpp
 	u1_attack.cpp
 	util.cpp

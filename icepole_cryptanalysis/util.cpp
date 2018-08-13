@@ -383,3 +383,11 @@ u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, co
 	return result;
 }
 
+//************************************************************************************************//
+
+void sym_sigint_cb(evutil_socket_t, short, void * arg)
+{
+	sym_event_param_t * eprm = (sym_event_param_t *)arg;
+	log4cpp::Category::getInstance(eprm->locat).notice("%s: SIGINT caught; breaking event loop.", __FUNCTION__);
+	event_base_loopbreak(eprm->the_base);
+}

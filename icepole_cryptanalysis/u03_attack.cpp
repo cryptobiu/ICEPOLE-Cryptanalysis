@@ -234,8 +234,8 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 }
 
 int bit_attack(const size_t bit_offset, const char * logcat,
-				   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-				   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+			   const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+			   aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
 {
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
@@ -265,8 +265,8 @@ int bit_attack(const size_t bit_offset, const char * logcat,
 }
 
 int bit_attack_check(const size_t bit_offset, const char * logcat,
-				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+				     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+					 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
 {
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
@@ -325,8 +325,8 @@ int bit_attack_check(const size_t bit_offset, const char * logcat,
 }
 
 int bit_attack_hack(const size_t bit_offset, const char * logcat,
-				   	     const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
-						 aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
+			        const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE], const u_int64_t init_state[4][5],
+					aes_prg & prg, size_t ctr_1[4], size_t ctr_2[4])
 {
 	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE];
 	unsigned long long clen;
