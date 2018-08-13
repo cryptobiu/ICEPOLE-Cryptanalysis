@@ -334,7 +334,7 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 			if(last_Sbox_lookup_filter((C+BLONG_SIZE), *bit, u3_omega_bits, 8, F2[*bit], logcat))
 			{
 				ctrs[*bit].ctr_1[counter_bits[*bit]]++;
-				if(F1 == F2)
+				if(F1[*bit] == F2[*bit])
 					ctrs[*bit].ctr_2[counter_bits[*bit]]++;
 			}
 		}
