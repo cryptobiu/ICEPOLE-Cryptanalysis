@@ -174,7 +174,7 @@ void * attacker(void * arg)
 		exit(__LINE__);
 	}
 
-	while(0 != run_flag_value)
+	while(0 != run_flag_value && prm->attacks_done < prm->required_attacks)
 	{
 		(*prm->bit_attack)(prm->id, prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctr_1, prm->ctr_2);
 		prm->attacks_done++;
