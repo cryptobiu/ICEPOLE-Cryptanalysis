@@ -93,7 +93,7 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 u_int8_t get_block_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_block_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
-u_int8_t lookup_counter_bits(const size_t bit_offset, const u_int64_t * C);
+void lookup_counter_bits(const u_int64_t * C, u_int8_t ctr_idx[64]);
 u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count);
 
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3)
@@ -332,13 +332,14 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C+BLONG_SIZE));
 
+	lookup_counter_bits(C, counter_bits);
+
 	std::set<size_t> fit_bits;
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
 		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit, u3_omega_bits, 8, F1[bit], logcat))
 		{
 			fit_bits.insert(bit);
-			counter_bits[bit] = lookup_counter_bits(bit, C);
 		}
 	}
 
@@ -385,6 +386,8 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C+BLONG_SIZE));
 
+	lookup_counter_bits(C, counter_bits);
+
 	//attack_check
 	crypto_aead_encrypt_hack((unsigned char *)C_h, &clen_h, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, XS);
 
@@ -394,7 +397,6 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 		if(last_Sbox_lookup_filter((C+BLONG_SIZE), bit, u3_omega_bits, 8, F1[bit], logcat))
 		{
 			fit_bits.insert(bit);
-			counter_bits[bit] = lookup_counter_bits(bit, C);
 
 			//attack_check
 			u_int8_t F1_h = xor_state_bits(XS, bit, u3_omega_bits, 8);
@@ -461,12 +463,13 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 
 	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, XS);
 
+	lookup_counter_bits(C, counter_bits);
+
 	std::set<size_t> fit_bits;
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
 		F1[bit] = xor_state_bits(XS, bit, u3_omega_bits, 8);
 		fit_bits.insert(bit);
-		counter_bits[bit] = lookup_counter_bits(bit, C);
 	}
 
 	if(!fit_bits.empty())
@@ -850,24 +853,15 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 	return false;
 }
 
-u_int8_t lookup_counter_bits(const size_t bit_offset, const u_int64_t * C)
+void lookup_counter_bits(const u_int64_t * C, u_int8_t ctr_idx[64])
 {
 	u_int64_t LC[BLONG_SIZE];
 	pi_rho_mu((const unsigned char *)C, (unsigned char *)LC);
 
-	u_int8_t bit_3_1_41 = 0;
-	if(RC2I(LC,3,1) & left_rotate(1, 41 + bit_offset))
+	for(size_t bit = 0; bit < 64; ++bit)
 	{
-		bit_3_1_41 = 1;
+		ctr_idx[bit] = ( (u_int8_t)((RC2I(LC,3,1) & left_rotate(0x1, 41 + bit))? 1: 0) << 1	) | ( (u_int8_t)((RC2I(LC,3,3) & left_rotate(1, 41 + bit))? 1: 0) );
 	}
-
-	u_int8_t bit_3_3_41 = 0;
-	if(RC2I(LC,3,3) & left_rotate(1, 41 + bit_offset))
-	{
-		bit_3_3_41 = 1;
-	}
-
-	return (bit_3_1_41 << 1) | bit_3_3_41;
 }
 
 int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat)
