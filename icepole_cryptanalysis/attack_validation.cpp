@@ -169,23 +169,23 @@ int validate_inputs_diff(const size_t bit_offset, int i, int j, const u_int64_t 
 	RC2I(P2,3,0) ^= 0x1;
 	RC2I(P2,3,2) ^= 0x1;
 	*/
-	u_int64_t positive = left_rotate(1, bit_offset);
+	u_int64_t mask = left_rotate(1, bit_offset);
 	switch(i)
 	{
 	case 0:
-		if(j == 2 && (P1v^P2v) != positive)
+		if(j == 2 && ((P1v^P2v) & mask) != mask)
 			return -1;
 		break;
 	case 1:
-		if((P1v^P2v) != positive)
+		if(((P1v^P2v) & mask) != mask)
 			return -1;
 		break;
 	case 2:
-		if((j == 1 || j == 3) && (P1v^P2v) != positive)
+		if((j == 1 || j == 3) && ((P1v^P2v) & mask) != mask)
 			return -1;
 		break;
 	case 3:
-		if((j == 0 || j == 2) && (P1v^P2v) != positive)
+		if((j == 0 || j == 2) && ((P1v^P2v) & mask) != mask)
 			return -1;
 		break;
 	default:
