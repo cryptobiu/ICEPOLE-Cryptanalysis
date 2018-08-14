@@ -84,6 +84,7 @@ u_int8_t get_block_bit(const u_int64_t * P, const size_t x, const size_t y, cons
 u_int8_t get_block_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 u_int8_t lookup_counter_bits(const size_t bit_offset, const u_int64_t * C);
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count);
 
 int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3)
 {
@@ -308,6 +309,10 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 	unsigned long long clen;
 
 	generate_input_p1(P1, prg, init_state, logcat);
+
+	for(size_t bit = 0; bit < 64; ++bit)
+		U03::validate_generated_input_1(bit, P1, init_state, logcat);
+
 	clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C+BLONG_SIZE));
@@ -319,12 +324,30 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 		{
 			fit_bits.insert(bit);
 			counter_bits[bit] = lookup_counter_bits(bit, C);
+
+			clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+			u_int64_t XS[4][5];
+			crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, XS);
+			u_int8_t hF1 = xor_state_bits(XS, bit, u3_omega_bits, 8);
+			if(hF1 != F1[bit])
+			{
+				log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - hF1 = %hhu != %hhu = F1!", __FUNCTION__, bit, hF1, F1);
+				log_buffer("key", key, KEY_SIZE, logcat, 0);
+				log_buffer("iv ", iv, KEY_SIZE, logcat, 0);
+				log_state("x_state", XS, logcat, 0);
+				log_block("P1", P1, logcat, 0);
+				exit(-1);
+			}
 		}
 	}
 
 	if(!fit_bits.empty())
 	{
 		generate_input_p2(fit_bits, P1, P2, logcat);
+
+		for(std::set<size_t>::const_iterator bit = fit_bits.begin(); bit != fit_bits.end(); ++bit)
+			U03::validate_generated_input_2(*bit, P1, P2, logcat);
+
 		clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
 		crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 		kappa5((unsigned char *)(C+BLONG_SIZE));
@@ -333,6 +356,22 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 		{
 			if(last_Sbox_lookup_filter((C+BLONG_SIZE), *bit, u3_omega_bits, 8, F2[*bit], logcat))
 			{
+
+				clen = 2 * BLONG_SIZE + ICEPOLE_TAG_SIZE;
+				u_int64_t XS[4][5];
+				crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, XS);
+				u_int8_t hF2 = xor_state_bits(XS, *bit, u3_omega_bits, 8);
+				if(hF2 != F2[*bit])
+				{
+					log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - hF2 = %hhu != %hhu = F2!", __FUNCTION__, *bit, hF2, F2);
+					log_buffer("key", key, KEY_SIZE, logcat, 0);
+					log_buffer("iv ", iv, KEY_SIZE, logcat, 0);
+					log_state("x_state", XS, logcat, 0);
+					log_block("P1", P1, logcat, 0);
+					log_block("P2", P2, logcat, 0);
+					exit(-1);
+				}
+
 				ctrs[*bit].ctr_1[counter_bits[*bit]]++;
 				if(F1[*bit] == F2[*bit])
 					ctrs[*bit].ctr_2[counter_bits[*bit]]++;
@@ -719,6 +758,7 @@ int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t i
 {
 	//Generation of random bytes in P1
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
+	memset(P1+BLONG_SIZE, 0, BLOCK_SIZE);
 
 	//XOR of P1 with the icepole init state into P1xIS
 	u_int64_t P1xIS[BLONG_SIZE];
@@ -795,6 +835,18 @@ int generate_input_p2(const std::set<size_t> & fit_bits, const u_int64_t P1[BLON
 		RC2I(P2,3,0) ^= mask;
 		RC2I(P2,3,2) ^= mask;
 	}
+}
+
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count)
+{
+	u_int8_t result = 0;
+	for(size_t i = 0; i < bit_count; ++i)
+	{
+		u_int64_t integer = state[bits[i].x][bits[i].y];
+		u_int64_t mask = left_rotate(0x1, bits[i].z + bit_offset);
+		result ^= ((integer & mask)? 1: 0);
+	}
+	return result;
 }
 
 }
