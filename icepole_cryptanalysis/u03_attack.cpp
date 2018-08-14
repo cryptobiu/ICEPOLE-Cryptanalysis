@@ -503,6 +503,7 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_in
 void v_extract(const std::vector<attacker_t> & atckr_prms, u_int8_t v[64][2], const char * logcat)
 {
 	bit_ctrs_t bit_ctrs[64];
+	memset(bit_ctrs, 0, 64*sizeof(bit_ctrs_t));
 	for(std::vector<attacker_t>::const_iterator atckr = atckr_prms.begin(); atckr != atckr_prms.end(); ++atckr)
 	{
 		for(size_t bit = 0; bit < 64; ++bit)
