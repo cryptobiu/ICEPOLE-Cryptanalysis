@@ -72,6 +72,12 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
 			   	    const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64]);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
+void v_extract(const std::vector<attacker_t> & atckr_prms, u_int8_t v[64][2], const char * logcat);
+/*
+void guess_u3(const std::vector<attacker_t> & atckr_prms, u_int64_t & U3, const char * logcat);
+void guess_u0(const std::vector<attacker_t> & atckr_prms, const u_int64_t & U3, u_int64_t & U0, const char * logcat);
+void guess_u3_bit(const size_t bit, const std::vector<attacker_t> & atckr_prms, u_int64_t & U3, const char * logcat);
+*/
 void get_init_block(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat);
 u_int64_t left_rotate(u_int64_t v, size_t r);
 void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat, const int level);
@@ -303,6 +309,12 @@ void * attacker(void * arg)
 			exit(__LINE__);
 		}
 	}
+	for(size_t bit = 0; bit < 64; ++bit)
+	{
+		for(size_t idx = 0; idx < 4; ++idx)
+			log4cpp::Category::getInstance(prm->logcat).debug("%s: bit %lu - ctr_1[%lu]=%lu; ctr_2[%lu]=%lu;",
+					__FUNCTION__, bit, idx, prm->ctrs[bit].ctr_1[idx], idx, prm->ctrs[bit].ctr_2[idx]);
+	}
 	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
 	return NULL;
 }
@@ -476,47 +488,56 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat)
 {
-	u_int64_t v[64][2], ctr_1[4], ctr_2[4];;
-	memset(v, 0, 64 * 2 * sizeof(u_int64_t));
+	u_int8_t v[64][2];
+	memset(v, 0, 64 * 2 * sizeof(u_int8_t));
+
+	v_extract(atckr_prms, v, logcat);
 
 	for(size_t bit = 0; bit < 64; ++bit)
+		U3 |= left_rotate(((u_int64_t)v[bit][0] ^ 1), 31 + bit);
+
+	for(size_t bit = 0; bit < 64; ++bit)
+		U0 |= ( U3 & left_rotate(1, 49 + bit) ) ^ left_rotate(v[bit][1], 49 + bit);
+}
+
+void v_extract(const std::vector<attacker_t> & atckr_prms, u_int8_t v[64][2], const char * logcat)
+{
+	bit_ctrs_t bit_ctrs[64];
+	for(std::vector<attacker_t>::const_iterator atckr = atckr_prms.begin(); atckr != atckr_prms.end(); ++atckr)
 	{
-		memset(ctr_1, 0, 4 * sizeof(u_int64_t));
-		memset(ctr_2, 0, 4 * sizeof(u_int64_t));
-		for(size_t thread = 0; thread < thread_count; ++thread)
+		for(size_t bit = 0; bit < 64; ++bit)
 		{
-			for(size_t ctr_idx = 0; ctr_idx < 4; ++ctr_idx)
+			for(size_t idx = 0; idx < 4; ++idx)
 			{
-				ctr_1[ctr_idx] += atckr_prms[thread].ctrs[bit].ctr_1[ctr_idx];
-				ctr_2[ctr_idx] += atckr_prms[thread].ctrs[bit].ctr_2[ctr_idx];
+				bit_ctrs[bit].ctr_1[idx] += atckr->ctrs[bit].ctr_1[idx];
+				bit_ctrs[bit].ctr_2[idx] += atckr->ctrs[bit].ctr_2[idx];
 			}
 		}
-		//------------------------------------------------------------------------//
-		size_t max_dev_counter_index = 4;
-		double max_dev = 0.0, dev;
-		for(size_t ctr_idx = 0; ctr_idx < 4; ++ctr_idx)
-		{
-			dev = (0 != ctr_1[ctr_idx])? fabs( ( double(ctr_2[ctr_idx]) / double(ctr_1[ctr_idx]) ) - 0.5 ): 0.0;
-			log4cpp::Category::getInstance(logcat).debug("%s: bit %lu - ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.08f;",
-					__FUNCTION__, bit, ctr_idx, ctr_1[ctr_idx], ctr_idx, ctr_2[ctr_idx], dev);
-			if(max_dev < dev)
-			{
-				max_dev = dev;
-				max_dev_counter_index = ctr_idx;
-			}
-		}
-		v[bit][0] = (max_dev_counter_index & 0x2)? 1: 0;
-		v[bit][1] = (max_dev_counter_index & 0x1)? 1: 0;
-
-		log4cpp::Category::getInstance(logcat).debug("%s: bit %lu - selected ctr-idx = %lu; v0 = %lu; v1 = %lu.",
-				__FUNCTION__, bit, max_dev_counter_index, v[bit][0], v[bit][1]);
-
-		U3 |= left_rotate((v[bit][0] ^ 1), 31 + bit);
 	}
 
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
-		U0 |= ( U3 & left_rotate(1, 49 + bit) ) ^ left_rotate(v[bit][1], 49 + bit);
+		size_t max_dev_counter_index = 4;
+		double max_dev = 0.0, dev;
+		for(size_t idx = 0; idx < 4; ++idx)
+		{
+			dev = (0 != bit_ctrs[bit].ctr_1[idx])? fabs( ( double(bit_ctrs[bit].ctr_2[idx]) / double(bit_ctrs[bit].ctr_1[idx]) ) - 0.5 ): 0.0;
+
+			log4cpp::Category::getInstance(logcat).debug("%s: bit %lu; ctr1[%lu]=%lu; ctr2[%lu]=%lu; dev=%.08f;",
+					__FUNCTION__, bit, idx, bit_ctrs[bit].ctr_1[idx], idx, bit_ctrs[bit].ctr_2[idx], dev);
+
+			if(max_dev < dev)
+			{
+				max_dev = dev;
+				max_dev_counter_index = idx;
+			}
+		}
+
+		v[bit][0] = (max_dev_counter_index & 0x2)? 1: 0;
+		v[bit][1] = (max_dev_counter_index & 0x1)? 1: 0;
+
+		log4cpp::Category::getInstance(logcat).debug("%s: bit %lu selected ctr-idx = %lu; v0 = %lu; v1 = %lu.",
+				__FUNCTION__, bit, max_dev_counter_index, v[bit][0], v[bit][1]);
 	}
 }
 
