@@ -575,6 +575,12 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 		else
 			return false;
 	}
+	if(1 < F_xor_res)
+	{
+		log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - invalid F1 value %hhu.", __FUNCTION__, bit_offset, F_xor_res);
+		log_block("P_perm_output", P_perm_output, logcat, 0);
+		exit(-1);
+	}
 	return true;
 }
 
