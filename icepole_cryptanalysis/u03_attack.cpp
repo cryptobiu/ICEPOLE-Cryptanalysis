@@ -58,7 +58,7 @@ typedef struct
 	size_t x, y, z;
 }block_bit_t;
 
-static const size_t thread_count = 1;
+static const size_t thread_count = 64;
 static const time_t allotted_time = 21600/*secs*/; //6hrs
 static const struct timeval _3sec = {3,0};
 static const block_bit_t u3_omega_bits[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12}, {1, 1, 35},
