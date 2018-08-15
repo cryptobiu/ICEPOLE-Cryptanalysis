@@ -57,13 +57,13 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 	snprintf(locat, 32, "%s.u2", logcat);
 
 	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv, logcat);
+	get_honest_init_state(init_state, key, iv, logcat);
 	init_state[0][4] = U0;
 	init_state[3][4] = U3;
 
-	std::vector<attacker_t> atckr_prms(thread_count);
-
 	log4cpp::Category::getInstance(logcat).notice("%s: Provided: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, U0, U3);
+
+	std::vector<attacker_t> atckr_prms(thread_count);
 
 	sem_t run_flag;
 	if(0 == sem_init(&run_flag, 0, 1))
@@ -158,15 +158,6 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 							guess_work(atckr_prms, U2, locat);
 
 							log4cpp::Category::getInstance(logcat).notice("%s: guessed U2 = 0x%016lX.", __FUNCTION__, U2);
-							log4cpp::Category::getInstance(logcat).notice("%s: actual  U2 = 0x%016lX.", __FUNCTION__, init_state[2][4]);
-
-							{
-								u_int64_t u2cmp = ~(U2 ^ init_state[2][4]);
-								size_t eq_bit_cnt = 0;
-								for(u_int64_t m = 0x1; m != 0; m <<= 1)
-									if(m & u2cmp) eq_bit_cnt++;
-								log4cpp::Category::getInstance(locat).notice("%s: correct guessed U2 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
-							}
 
 							result = 0;
 

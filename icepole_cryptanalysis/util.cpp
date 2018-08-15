@@ -113,48 +113,32 @@ u_int64_t left_rotate(u_int64_t v, size_t r)
 	return (v << r) | (v >> (64-r));
 }
 
-void get_init_block(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat)
+void get_honest_init_state(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat)
 {
 	u_int8_t C[128+16];
 	memset(C, 0, 128+16);
 	unsigned long long clen = 128+16;
 	u_int8_t P[128] = { 0 };
 
-	const u_int64_t * pC = (const u_int64_t *)C;
 	crypto_aead_encrypt((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key);
+
+	const u_int64_t * pC = (const u_int64_t *)C;
 	for(int i = 0; i < 4; ++i)
 		for(int j = 0; j < 4; ++j)
 			is[i][j] = RC2I(pC,i,j);
 
 	for(int i = 0; i < 4; ++i)
 		is[i][4] = 0;
+}
 
-//	crypto_aead_encrypt_i((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key, is);
+void get_hacked_init_state(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat)
+{
+	u_int8_t C[128+16];
+	memset(C, 0, 128+16);
+	unsigned long long clen = 128+16;
+	u_int8_t P[128] = { 0 };
 
-//	{
-//		/*
-//		The code below proves that the hacked init state's first four columns are identical
-//		to the XOR of a single block with its encryption result P^C (In the specific example here P=0 so C=P^C).
-//		Later, when we no longer need crutches, the crypto_aead_encrypt_i(...) will be replaced with
-//		a regular crypto_aead_encrypt(...) call and C will be placed inside the first four columns of
-//		is and the fifth column will be zeroed out.
-//		*/
-//		const u_int64_t * pC = (const u_int64_t *)C;
-//		for(int i = 0; i < 4; ++i)
-//		{
-//			for(int j = 0; j < 4; ++j)
-//			{
-//				if(RC2I(pC,i,j) != is[i][j])
-//				{
-//					log4cpp::Category::getInstance(logcat).fatal("%s: init state validation failure.", __FUNCTION__);
-//					log_state("is", is, logcat, 0);
-//					log_block("P", (const u_int64_t *)P, logcat, 0);
-//					log_block("C", (const u_int64_t *)C, logcat, 0);
-//					exit(-1);
-//				}
-//			}
-//		}
-//	}
+	crypto_aead_encrypt_i((unsigned char *)C, &clen, (const unsigned char *)P, 128, NULL, 0, NULL, iv, key, is);
 }
 
 void * attacker(void * arg)

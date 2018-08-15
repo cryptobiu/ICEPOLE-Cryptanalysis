@@ -57,7 +57,7 @@ int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 	snprintf(locat, 32, "%s.u1", logcat);
 
 	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv, logcat);
+	get_honest_init_state(init_state, key, iv, logcat);
 	init_state[0][4] = U0;
 	init_state[2][4] = U2;
 	init_state[3][4] = U3;
@@ -159,15 +159,6 @@ int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 							guess_work(atckr_prms, U1, locat);
 
 							log4cpp::Category::getInstance(logcat).notice("%s: guessed U1 = 0x%016lX.", __FUNCTION__, U1);
-							log4cpp::Category::getInstance(logcat).notice("%s: actual  U1 = 0x%016lX.", __FUNCTION__, init_state[1][4]);
-
-							{
-								u_int64_t u2cmp = ~(U1 ^ init_state[1][4]);
-								size_t eq_bit_cnt = 0;
-								for(u_int64_t m = 0x1; m != 0; m <<= 1)
-									if(m & u2cmp) eq_bit_cnt++;
-								log4cpp::Category::getInstance(locat).notice("%s: correct guessed U1 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
-							}
 
 							result = 0;
 
@@ -473,33 +464,6 @@ int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u
 	RC2I(P2,2,3) ^= mask;
 	RC2I(P2,3,1) ^= mask;
 	return 0;
-}
-
-int attack_u1_gen_test(const char * logcat, const u_int8_t * key, const u_int8_t * iv, aes_prg & prg)
-{
-	int result = -1;
-
-	char locat[32];
-	snprintf(locat, 32, "%s.u1", logcat);
-
-	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv, logcat);
-
-	log_state("init_state", init_state, logcat, 500);
-
-	u_int64_t P1[2*BLONG_SIZE], P2[2*BLONG_SIZE];
-	for(size_t bit_offset = 0; bit_offset < 64; ++bit_offset)
-	{
-		log4cpp::Category::getInstance(logcat).notice("%s: bit_offset = %lu.", __FUNCTION__, bit_offset);
-
-		generate_input_p1(bit_offset, P1, prg, init_state, logcat);
-		log_block("P1", P1, logcat, 500);
-		U1::validate_generated_input_1(bit_offset, P1, init_state, logcat);
-
-		generate_input_p2(bit_offset, P1, P2, logcat);
-		log_block("P2", P2, logcat, 500);
-		U1::validate_generated_input_2(bit_offset, P1, P2, logcat);
-	}
 }
 
 }//namespace ATTACK_U1
