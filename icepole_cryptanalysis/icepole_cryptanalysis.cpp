@@ -157,6 +157,11 @@ void cryptanalysis()
 	u_int64_t is[4][5];
 	get_hacked_init_state(is, key, iv, logcat);
 
+	log4cpp::Category::getInstance(logcat).notice("%s: guess U0 = 0x%016lX.", __FUNCTION__, U[0]);
+	log4cpp::Category::getInstance(logcat).notice("%s: guess U1 = 0x%016lX.", __FUNCTION__, U[1]);
+	log4cpp::Category::getInstance(logcat).notice("%s: guess U2 = 0x%016lX.", __FUNCTION__, U[2]);
+	log4cpp::Category::getInstance(logcat).notice("%s: guess U3 = 0x%016lX.", __FUNCTION__, U[3]);
+
 	log4cpp::Category::getInstance(logcat).notice("%s: actual  U0 = 0x%016lX.", __FUNCTION__, is[0][4] ^ 3);
 	log4cpp::Category::getInstance(logcat).notice("%s: actual  U1 = 0x%016lX.", __FUNCTION__, is[1][4]);
 	log4cpp::Category::getInstance(logcat).notice("%s: actual  U2 = 0x%016lX.", __FUNCTION__, is[2][4]);
