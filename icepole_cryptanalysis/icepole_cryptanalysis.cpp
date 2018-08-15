@@ -162,10 +162,10 @@ void cryptanalysis()
 	log4cpp::Category::getInstance(logcat).notice("%s: guess U2 = 0x%016lX.", __FUNCTION__, U[2]);
 	log4cpp::Category::getInstance(logcat).notice("%s: guess U3 = 0x%016lX.", __FUNCTION__, U[3]);
 
-	log4cpp::Category::getInstance(logcat).notice("%s: actual  U0 = 0x%016lX.", __FUNCTION__, is[0][4] ^ 3);
-	log4cpp::Category::getInstance(logcat).notice("%s: actual  U1 = 0x%016lX.", __FUNCTION__, is[1][4]);
-	log4cpp::Category::getInstance(logcat).notice("%s: actual  U2 = 0x%016lX.", __FUNCTION__, is[2][4]);
-	log4cpp::Category::getInstance(logcat).notice("%s: actual  U3 = 0x%016lX.", __FUNCTION__, is[3][4]);
+	log4cpp::Category::getInstance(logcat).notice("%s: actual U0 = 0x%016lX.", __FUNCTION__, is[0][4] ^ 3);
+	log4cpp::Category::getInstance(logcat).notice("%s: actual U1 = 0x%016lX.", __FUNCTION__, is[1][4]);
+	log4cpp::Category::getInstance(logcat).notice("%s: actual U2 = 0x%016lX.", __FUNCTION__, is[2][4]);
+	log4cpp::Category::getInstance(logcat).notice("%s: actual U3 = 0x%016lX.", __FUNCTION__, is[3][4]);
 
 	{
 		u_int64_t u0cmp = ~(U[0] ^ (is[0][4] ^ 3));
