@@ -112,7 +112,7 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 								memset(atckr_prms[i].ctr_1, 0, 4 * sizeof(u_int64_t));
 								memset(atckr_prms[i].ctr_2, 0, 4 * sizeof(u_int64_t));
 								atckr_prms[i].attacks_done = 0;
-								atckr_prms[i].required_attacks = pow(2, 32.7)+1;
+								atckr_prms[i].required_attacks = pow(2, 31.7)+1;
 								atckr_prms[i].bit_attack = bit_attack;
 								//atckr_prms[i].bit_attack = bit_attack_check;
 								//atckr_prms[i].bit_attack = bit_attack_hack;
