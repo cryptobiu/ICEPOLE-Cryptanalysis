@@ -73,7 +73,7 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 			   	    const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64]);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 void v_extract(const std::vector<attacker_t> & atckr_prms, u_int8_t v[64][2], const char * logcat);
-void get_init_block(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat);
+void get_init_state(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat);
 u_int64_t left_rotate(u_int64_t v, size_t r);
 void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat, const int level);
 void log_block(const char * label, const u_int64_t * block, const char * logcat, const int level);
@@ -99,7 +99,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 	snprintf(locat, 32, "%s.u03", logcat);
 
 	u_int64_t init_state[4][5];
-	get_init_block(init_state, key, iv, logcat);
+	get_init_state(init_state, key, iv, logcat);
 	log4cpp::Category::getInstance(logcat).notice("%s: Real: U0=0x%016lX; U3=0x%016lX;", __FUNCTION__, init_state[0][4], init_state[3][4] ^ 3);
 
 	std::vector<attacker_t> atckr_prms(thread_count);
@@ -514,7 +514,7 @@ void v_extract(const std::vector<attacker_t> & atckr_prms, u_int8_t v[64][2], co
 	}
 }
 
-void get_init_block(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat)
+void get_init_state(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat)
 {
 	u_int8_t C[128+16];
 	memset(C, 0, 128+16);

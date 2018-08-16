@@ -281,6 +281,134 @@ void validate_counter_bits(const size_t bit_offset, const u_int64_t * C, const s
 
 }//namespace U03
 
+namespace U2
+{
+
+int validate_generated_input_1st_constraint(const size_t bit_offset, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+{
+	/*	1st constraint: xor of the bits of this mask should be equal to 1
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L,0x0000000000000000L
+	[0,3] , [1,3] , [3,2]		 */
+	u_int64_t mask = left_rotate(0x0000000008000000, bit_offset);
+	if(0 == ( mask & ( RC2I(PxorIS,0,3) ^ RC2I(PxorIS,1,3) ^ RC2I(PxorIS,3,2) ) ) )
+		return -1;
+	return 0;
+}
+
+int validate_generated_input_2nd_constraint(const size_t bit_offset, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+{
+	/* 2nd constraint: xor of the bits of this mask should be equal to 1
+	0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000020000L,0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	[0,1] , [1,0] , [1,2] , [2,0] , [3,1]	 */
+	u_int64_t mask = left_rotate(0x0000000000020000, bit_offset);
+	if (0 == ( mask & ( RC2I(PxorIS,0,1) ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,1,2) ^ RC2I(PxorIS,2,0) ^ RC2I(PxorIS,3,1) ) ) )
+		return -1;
+	return 0;
+}
+
+int validate_generated_input_3rd_constraint(const size_t bit_offset, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+{
+	/* 3rd constraint: xor of the bits of this mask should be equal to 1
+	0x0000000000000000L,0x0400000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0400000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0400000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0400000000000000L,0x0000000000000000L,0x0400000000000000L,0x0000000000000000L,0x0000000000000000L
+	[0,1] , [1,0] , [2,1] , [3,0] , [3,2]	 */
+	u_int64_t mask = left_rotate(0x0400000000000000, bit_offset);
+	if (0 == ( mask & ( RC2I(PxorIS,0,1) ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,2,1) ^ RC2I(PxorIS,3,0) ^ RC2I(PxorIS,3,2) ) ) )
+		return -1;
+	return 0;
+}
+
+int validate_generated_input_4th_constraint(const size_t bit_offset, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+{
+	/* 4th constraint: xor of the bits of this mask should be equal to 0
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000100L
+	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	[0,4]=U0 , [1,0] , [2,0] , [3,0]	*/
+	u_int64_t mask = left_rotate(0x0000000000000100, bit_offset);
+	if (0 != ( mask & ( init_state[0][4] ^ RC2I(PxorIS,1,0) ^ RC2I(PxorIS,2,0) ^ RC2I(PxorIS,3,0) ) ) )
+		return -1;
+	return 0;
+}
+
+int validate_generated_input_5th_constraint(const size_t bit_offset, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
+{
+	/* 5th constraint: xor of the bits of this mask should be equal to 0
+	0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
+	[0,2] , [1,3] , [2,3] , [3,3]	*/
+	u_int64_t mask = left_rotate(0x0000000000800000, bit_offset);
+	if (0 != ( mask & ( RC2I(PxorIS,0,2) ^ RC2I(PxorIS,1,3) ^ RC2I(PxorIS,2,3) ^ RC2I(PxorIS,3,3) ) ) )
+		return -1;
+	return 0;
+}
+
+void validate_generated_input_1(const size_t bit_offset, const u_int64_t * P, const u_int64_t init_state[4][5], const char * logcat)
+{
+	u_int64_t PxorIS[4*4];
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 4; ++j)
+		{
+			RC2I(PxorIS, i, j) = RC2I(P, i, j) ^ init_state[i][j];
+		}
+	}
+
+	if(0 != validate_generated_input_1st_constraint(bit_offset, PxorIS, init_state, logcat))
+	{
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 1st constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log_block("P", P, logcat, 0);
+		log_state("IS", init_state, logcat, 0);
+		exit(-1);
+	}
+
+	if(0 != validate_generated_input_2nd_constraint(bit_offset, PxorIS, init_state, logcat))
+	{
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 2nd constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log_block("P", P, logcat, 0);
+		log_state("IS", init_state, logcat, 0);
+		exit(-1);
+	}
+
+	if(0 != validate_generated_input_3rd_constraint(bit_offset, PxorIS, init_state, logcat))
+	{
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 3rd constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log_block("P", P, logcat, 0);
+		log_state("IS", init_state, logcat, 0);
+		exit(-1);
+	}
+
+	if(0 != validate_generated_input_4th_constraint(bit_offset, PxorIS, init_state, logcat))
+	{
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 4th constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log_block("P", P, logcat, 0);
+		log_state("IS", init_state, logcat, 0);
+		exit(-1);
+	}
+
+	if(0 != validate_generated_input_5th_constraint(bit_offset, PxorIS, init_state, logcat))
+	{
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 4th constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log_block("P", P, logcat, 0);
+		log_state("IS", init_state, logcat, 0);
+		exit(-1);
+	}
+	log4cpp::Category::getInstance(logcat).info("%s: generated input 4 constraints check out.", __FUNCTION__);
+}
+
+}//namespace U2
+
 namespace U1
 {
 int validate_generated_input_1st_constraint(const size_t bit_offset, const u_int64_t * PxorIS, const u_int64_t init_state[4][5], const char * logcat)
