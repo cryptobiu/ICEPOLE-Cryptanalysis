@@ -297,9 +297,8 @@ void * attacker(void * arg)
 	}
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
-		for(size_t idx = 0; idx < 4; ++idx)
-			log4cpp::Category::getInstance(prm->logcat).debug("%s: bit %lu - ctr_1[%lu]=%lu; ctr_2[%lu]=%lu;",
-					__FUNCTION__, bit, idx, prm->ctrs[bit].ctr_1[idx], idx, prm->ctrs[bit].ctr_2[idx]);
+		log4cpp::Category::getInstance(prm->logcat).debug("%s: bit %lu - ctr_1[%lu]=%lu; ctr_2[%lu]=%lu;",
+				__FUNCTION__, bit, 0, prm->ctrs[bit].ctr_1[0], 0, prm->ctrs[bit].ctr_2[0]);
 	}
 	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
 	return NULL;
