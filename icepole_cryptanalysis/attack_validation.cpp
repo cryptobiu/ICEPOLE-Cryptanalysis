@@ -367,7 +367,7 @@ void validate_generated_input_1(const size_t bit_offset, const u_int64_t * P, co
 
 	if(0 != validate_generated_input_1st_constraint(bit_offset, PxorIS, init_state, logcat))
 	{
-		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 1st constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 1st constraint violation; bit=%lu.", __FUNCTION__, bit_offset);
 		log_block("P", P, logcat, 0);
 		log_state("IS", init_state, logcat, 0);
 		exit(-1);
@@ -375,7 +375,7 @@ void validate_generated_input_1(const size_t bit_offset, const u_int64_t * P, co
 
 	if(0 != validate_generated_input_2nd_constraint(bit_offset, PxorIS, init_state, logcat))
 	{
-		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 2nd constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 2nd constraint violation; bit=%lu.", __FUNCTION__, bit_offset);
 		log_block("P", P, logcat, 0);
 		log_state("IS", init_state, logcat, 0);
 		exit(-1);
@@ -383,15 +383,16 @@ void validate_generated_input_1(const size_t bit_offset, const u_int64_t * P, co
 
 	if(0 != validate_generated_input_3rd_constraint(bit_offset, PxorIS, init_state, logcat))
 	{
-		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 3rd constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 3rd constraint violation; bit=%lu.", __FUNCTION__, bit_offset);
 		log_block("P", P, logcat, 0);
 		log_state("IS", init_state, logcat, 0);
+		log_block("PxIS", PxorIS, logcat, 0);
 		exit(-1);
 	}
 
 	if(0 != validate_generated_input_4th_constraint(bit_offset, PxorIS, init_state, logcat))
 	{
-		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 4th constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 4th constraint violation; bit=%lu.", __FUNCTION__, bit_offset);
 		log_block("P", P, logcat, 0);
 		log_state("IS", init_state, logcat, 0);
 		exit(-1);
@@ -399,12 +400,12 @@ void validate_generated_input_1(const size_t bit_offset, const u_int64_t * P, co
 
 	if(0 != validate_generated_input_5th_constraint(bit_offset, PxorIS, init_state, logcat))
 	{
-		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 4th constraint violation; id=%lu.", __FUNCTION__, bit_offset);
+		log4cpp::Category::getInstance(logcat).fatal("%s: generated input 4th constraint violation; bit=%lu.", __FUNCTION__, bit_offset);
 		log_block("P", P, logcat, 0);
 		log_state("IS", init_state, logcat, 0);
 		exit(-1);
 	}
-	log4cpp::Category::getInstance(logcat).info("%s: generated input 4 constraints check out.", __FUNCTION__);
+	log4cpp::Category::getInstance(logcat).info("%s: generated input 5 constraints check out for bit %lu.", __FUNCTION__, bit_offset);
 }
 
 }//namespace U2

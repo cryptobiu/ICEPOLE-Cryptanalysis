@@ -31,6 +31,8 @@
 #include "u2_attack.h"
 #include "u1_attack.h"
 
+#include "util.h"
+
 void get_options(int argc, char *argv[], int * log_level);
 void show_usage(const char * prog);
 void init_log(const char * a_log_file, const char * a_log_dir, const int log_level, const char * logcat);
@@ -133,19 +135,24 @@ void cryptanalysis()
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
 
+	/*
 	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
 		return;
 	}
+	*/
 
-	/*
-	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
+	u_int64_t init_state[4][5];
+	get_init_block(init_state, key, iv, logcat);
+
+	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], /*U[0]*/init_state[0][4], /*U[3]*/init_state[3][4]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
 		return;
 	}
 
+	/*
 	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);

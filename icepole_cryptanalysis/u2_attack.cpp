@@ -58,7 +58,7 @@ typedef struct
 	size_t x, y, z;
 }block_bit_t;
 
-static const size_t thread_count = 64;
+static const size_t thread_count = 1;
 static const time_t allotted_time = 21600/*secs*/; //6hrs
 static const struct timeval _3sec = {3,0};
 static const block_bit_t u2_omega_bits[6] = { {0,0,3}, {0,1,49}, {1,1,51}, {2,2,46}, {3,2,26}, {3,3,41} };
@@ -78,7 +78,7 @@ void log_state(const char * label, const u_int64_t state[4][5], const char * log
 void sigint_cb(evutil_socket_t, short, void * arg);
 void timer_cb(evutil_socket_t, short, void * arg);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, const char * logcat);
-int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
+int generate_input_p1(u_int64_t P1[2*BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
 int generate_input_p2(const size_t thd_id, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset,
 							 const block_bit_t * bits, const size_t bit_count,
@@ -150,9 +150,9 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctrs, 0, 64 * sizeof(bit_ctrs_t));
 								atckr_prms[i].attacks_done = 0;
-								atckr_prms[i].required_attacks = (pow(2, 32.7)/thread_count)+1;
-								atckr_prms[i].attack = the_attack;
-								//atckr_prms[i].attack = the_attack_check;
+								atckr_prms[i].required_attacks = 10;//(pow(2, 22)/thread_count)+1;//(pow(2, 32.7)/thread_count)+1;
+								//atckr_prms[i].attack = the_attack;
+								atckr_prms[i].attack = the_attack_check;
 								//atckr_prms[i].attack = the_attack_hack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
@@ -285,6 +285,7 @@ void * attacker(void * arg)
 	{
 		(*prm->attack)(prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctrs);
 		prm->attacks_done++;
+		log4cpp::Category::getInstance(prm->logcat).debug("%s: %lu attacks done.", __FUNCTION__, prm->attacks_done);
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
@@ -343,28 +344,30 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 {
 	u_int64_t P1[2 * BLONG_SIZE];
 	generate_input_p1(P1, prg, init_state, logcat);
-	for(size_t bit = 0; bit < 63; ++bit)
+	for(size_t bit = 0; bit < 64; ++bit)
 		U2::validate_generated_input_1(bit, P1, init_state, logcat);
 
+	log4cpp::Category::getInstance(logcat).debug("%s: encrypting P1.", __FUNCTION__);
+
 	u_int8_t F1;
-	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+	u_int8_t C1[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt((unsigned char *)C1, &clen1, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C1+BLONG_SIZE));
 
-	unsigned long long clen1_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
-	u_int64_t C1_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-	u_int64_t p1_x_state_check[4][5];
 	u_int8_t F1_check;
-
-	clen1_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+	u_int8_t C1_check[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE];
+	unsigned long long clen1_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
+	u_int64_t p1_x_state_check[4][5];
 	crypto_aead_encrypt_hack((unsigned char *)C1_check, &clen1_check, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p1_x_state_check);
+
+	log4cpp::Category::getInstance(logcat).debug("%s: encrypting P1 done.", __FUNCTION__);
 
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
-		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 8, F1, logcat))
+		if(last_Sbox_lookup_filter((const u_int64_t*)(C1+BLOCK_SIZE), bit, u2_omega_bits, 6, F1, logcat))
 		{
-			F1_check = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 8);
+			F1_check = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 6);
 			if(F1_check != F1)
 			{
 				log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - F1_check = %hhu != %hhu = F1.", __FUNCTION__, bit, F1_check, F1);
@@ -386,7 +389,7 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 			kappa5((unsigned char *)(C2+BLONG_SIZE));
 
 			u_int8_t F2;
-			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u2_omega_bits, 8, F2, logcat))
+			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u2_omega_bits, 6, F2, logcat))
 			{
 				unsigned long long clen2_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
 				u_int64_t C2_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
@@ -394,7 +397,7 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 				u_int8_t F2_check;
 
 				crypto_aead_encrypt_hack((unsigned char *)C2_check, &clen2_check, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p2_x_state_check);
-				F2_check = xor_state_bits(p2_x_state_check, bit, u2_omega_bits, 8);
+				F2_check = xor_state_bits(p2_x_state_check, bit, u2_omega_bits, 6);
 				if(F2_check != F2)
 				{
 					log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - F2_check = %hhu != %hhu = F2.", __FUNCTION__, bit, F2_check, F2);
@@ -426,7 +429,7 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
 		u_int8_t F1, F2;
-		F1 = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 8);
+		F1 = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 6);
 
 		u_int64_t P2[2 * BLONG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 		unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
@@ -434,7 +437,7 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 
 		generate_input_p2(bit, P1, P2, logcat);
 		crypto_aead_encrypt_hack((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p2_x_state_check);
-		F2 = xor_state_bits(p2_x_state_check, bit, u2_omega_bits, 8);
+		F2 = xor_state_bits(p2_x_state_check, bit, u2_omega_bits, 6);
 
 		ctrs[bit].ctr_1[0]++;
 		if(F1 == F2)
@@ -573,61 +576,64 @@ void timer_cb(evutil_socket_t, short, void * arg)
 	}
 }
 
-int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat)
+void xor_set(const u_int64_t current, u_int64_t & target, bool bits)
 {
+	if(bits)
+		target ^= ~current;
+	else
+		target ^= current;
+}
+
+int generate_input_p1(u_int64_t P1[2*BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat)
+{
+#define PxIS(x,y)		(RC2I(P1,x,y)^init_state[x][y])
 	//Generation of random bytes in P1
 	prg.gen_rand_bytes((u_int8_t *)P1, BLOCK_SIZE);
-
-	//XOR of P1 with the icepole init state into P1xIS
-	u_int64_t P1xIS[BLONG_SIZE];
-	for(size_t i = 0; i < 4; ++i)
-		for(size_t j = 0; j < 4; ++j)
-			RC2I(P1xIS,i,j) = RC2I(P1,i,j) ^ init_state[i][j];
 
 	/* 4th constraint: xor of the bits of this mask should be equal to 0
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000100L
 	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000100L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
-	[0,4]=U0 , [1,0] , [2,0] , [3,0]	*/
-	RC2I(P1xIS,1,0) ^= (init_state[0][4] ^ RC2I(P1xIS,1,0) ^ RC2I(P1xIS,2,0) ^ RC2I(P1xIS,3,0));
+	[0,4]=U0 , [1,0] , [2,0] , [3,0]																[3,0]*/
+	RC2I(P1,3,0) ^= (init_state[0][4] ^ PxIS(1,0) ^ PxIS(2,0) ^ PxIS(3,0));
 
 	/*	1st constraint: xor of the bits of this mask should be equal to 1
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000008000000L,0x0000000000000000L,0x0000000000000000L
-	[0,3] , [1,3] , [3,2]		 */
-	RC2I(P1,0,3) ^= ~(RC2I(P1xIS,0,3) ^ RC2I(P1xIS,1,3) ^ RC2I(P1xIS,3,2));
+	[0,3] , [1,3] , [3,2]		 																	[3,2]*/
+	RC2I(P1,3,2) ^= ~(PxIS(0,3) ^ PxIS(1,3) ^ PxIS(3,2));
 
 	/* 2nd constraint: xor of the bits of this mask should be equal to 1
 	0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000020000L,0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000020000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
-	[0,1] , [1,0] , [1,2] , [2,0] , [3,1]	 */
-	RC2I(P1,3,1) ^= ~(RC2I(P1xIS,0,1) ^ RC2I(P1xIS,1,0) ^ RC2I(P1xIS,1,2) ^ RC2I(P1xIS,2,0) ^ RC2I(P1xIS,3,1));
+	[0,1] , [1,0] , [1,2] , [2,0] , [3,1]	 														[1,2]*/
+	RC2I(P1,1,2) ^= ~(PxIS(0,1) ^ PxIS(1,0) ^ PxIS(1,2) ^ PxIS(2,0) ^ PxIS(3,1));
 
 	/* 3rd constraint: xor of the bits of this mask should be equal to 1
 	0x0000000000000000L,0x0400000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0400000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000000L,0x0400000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
 	0x0400000000000000L,0x0000000000000000L,0x0400000000000000L,0x0000000000000000L,0x0000000000000000L
-	[0,1] , [1,0] , [2,1] , [3,0] , [3,2]	 */
-	RC2I(P1xIS,2,1) ^= ~(RC2I(P1xIS,0,1) ^ RC2I(P1xIS,1,0) ^ RC2I(P1xIS,2,1) ^ RC2I(P1xIS,3,0) ^ RC2I(P1xIS,3,2));
+	[0,1] , [1,0] , [2,1] , [3,0] , [3,2]	 														[2,1]*/
+	RC2I(P1,2,1) ^= ~(PxIS(0,1) ^ PxIS(1,0) ^ PxIS(2,1) ^ PxIS(3,0) ^ PxIS(3,2));
 
 	/* 5th constraint: xor of the bits of this mask should be equal to 0
 	0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
 	0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000800000L,0x0000000000000000L
-	[0,2] , [1,3] , [2,3] , [3,3]	*/
-	RC2I(P1,3,3) ^= (RC2I(P1xIS,0,2) ^ RC2I(P1xIS,1,3) ^ RC2I(P1xIS,2,3) ^ RC2I(P1xIS,3,3));
+	[0,2] , [1,3] , [2,3] , [3,3]																	[3,3]*/
+	RC2I(P1,3,3) ^= (PxIS(0,2) ^ PxIS(1,3) ^ PxIS(2,3) ^ PxIS(3,3));
+#undef PxIS
 
 	//set the 2nd block of P1 to zeroes
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
 	return 0;
-
 }
 
 int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat)
@@ -844,6 +850,37 @@ u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, co
 		result ^= ((integer & mask)? 1: 0);
 	}
 	return result;
+}
+
+void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, const char * logcat)
+{
+	u_int64_t bit_ctrs[64][2];
+	memset(bit_ctrs, 0, 64*2*sizeof(u_int64_t));
+	for(std::vector<attacker_t>::const_iterator atckr = atckr_prms.begin(); atckr != atckr_prms.end(); ++atckr)
+	{
+		for(size_t bit = 0; bit < 64; ++bit)
+		{
+			bit_ctrs[bit][0] += atckr->ctrs[bit].ctr_1[0];
+			bit_ctrs[bit][1] += atckr->ctrs[bit].ctr_2[0];
+		}
+	}
+
+	U2 = 0;
+	for(size_t bit = 0; bit < 64; ++bit)
+	{
+		double dev = (bit_ctrs[bit][0] != 0)? fabs( ( double(bit_ctrs[bit][1]) / double(bit_ctrs[bit][0]) ) - 0.5): 0.0;
+		log4cpp::Category::getInstance(logcat).debug("%s: bit %lu; ctr_1=%lu; ctr_2=%lu; dev=%.05f;",
+				__FUNCTION__, bit_ctrs[bit][0], bit_ctrs[bit][1], dev);
+		if(pow(2.0, -9.83) >= dev)
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: U2 bit %lu = 1", __FUNCTION__, 27 + bit);
+			U2 |= left_rotate(0x1, 27 + bit);
+		}
+		else
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: U2 bit %lu = 0", __FUNCTION__, 27 + bit);
+		}
+	}
 }
 
 }//namespace ATTACK_U2
