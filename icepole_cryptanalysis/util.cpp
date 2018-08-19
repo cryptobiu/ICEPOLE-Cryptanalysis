@@ -71,3 +71,15 @@ void log_state(const char * label, const u_int64_t state[4][5], const char * log
 	}
 }
 
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count)
+{
+	u_int8_t result = 0;
+	for(size_t i = 0; i < bit_count; ++i)
+	{
+		u_int64_t integer = state[bits[i].x][bits[i].y];
+		u_int64_t mask = left_rotate(0x1, bits[i].z + bit_offset);
+		result ^= ((integer & mask)? 1: 0);
+	}
+	return result;
+}
+

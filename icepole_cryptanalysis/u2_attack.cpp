@@ -49,11 +49,6 @@ typedef struct
 	time_t start_time;
 }event_param_t;
 
-typedef struct
-{
-	size_t x, y, z;
-}block_bit_t;
-
 static const size_t thread_count = 64;
 static const time_t allotted_time = 21600/*secs*/; //6hrs
 static const struct timeval _3sec = {3,0};
@@ -78,7 +73,6 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 u_int8_t get_block_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_block_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
-u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count);
 
 int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U2, const u_int64_t & U0, const u_int64_t & U3)
 {
@@ -761,18 +755,6 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 	default: return false;
 	}
 	return false;
-}
-
-u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count)
-{
-	u_int8_t result = 0;
-	for(size_t i = 0; i < bit_count; ++i)
-	{
-		u_int64_t integer = state[bits[i].x][bits[i].y];
-		u_int64_t mask = left_rotate(0x1, bits[i].z + bit_offset);
-		result ^= ((integer & mask)? 1: 0);
-	}
-	return result;
 }
 
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, const char * logcat)
