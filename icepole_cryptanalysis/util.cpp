@@ -83,3 +83,45 @@ u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, co
 	return result;
 }
 
+void * attacker(void * arg)
+{
+	attacker_t * prm = (attacker_t *)arg;
+
+	char atckr_locat[32];
+	snprintf(atckr_locat, 32, "%s.%lu", prm->logcat.c_str(), prm->id);
+	prm->logcat = atckr_locat;
+
+	aes_prg prg;
+	if(0 != prg.init(BLOCK_SIZE))
+	{
+		log4cpp::Category::getInstance(prm->logcat).error("%s: prg.init() failure", __FUNCTION__);
+		return NULL;
+	}
+
+	int run_flag_value;
+	if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
+	{
+		int errcode = errno;
+		char errmsg[256];
+		log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
+				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+		exit(__LINE__);
+	}
+
+	while(0 != run_flag_value && prm->attacks_done < prm->required_attacks)
+	{
+		(*prm->attack)(prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctrs);
+		prm->attacks_done++;
+
+		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
+		{
+			int errcode = errno;
+			char errmsg[256];
+			log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
+					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
+			exit(__LINE__);
+		}
+	}
+	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
+	return NULL;
+}

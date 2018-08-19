@@ -23,39 +23,8 @@
 namespace ATTACK_U1
 {
 
-typedef struct
-{
-	u_int64_t ctr_1[4], ctr_2[4];
-}bit_ctrs_t;
-
-typedef struct
-{
-	size_t id;
-	std::string logcat;
-	sem_t * run_flag;
-	u_int8_t * key, * iv;
-	u_int64_t init_state[4][5];
-	bit_ctrs_t ctrs[64];
-	size_t required_attacks, attacks_done;
-
-	int (*attack)(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-				  const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64]);
-}attacker_t;
-
-typedef struct
-{
-	struct event_base * the_base;
-	std::string locat;
-	std::vector<attacker_t> * atckr_prms;
-	time_t start_time;
-}event_param_t;
-
-static const size_t thread_count = 64;
-static const time_t allotted_time = 21600/*secs*/; //6hrs
-static const struct timeval _3sec = {3,0};
 static const block_bit_t u1_omega_bits[6] = { {0,0,61}, {0,1,43}, {1,1,45}, {2,2,40}, {3,2,20}, {3,3,35} };
 
-void * attacker(void * arg);
 int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
 			   const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64]);
 int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
@@ -246,55 +215,6 @@ int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
 	}
 	return result;
-}
-
-void * attacker(void * arg)
-{
-	attacker_t * prm = (attacker_t *)arg;
-
-	char atckr_locat[32];
-	snprintf(atckr_locat, 32, "%s.%lu", prm->logcat.c_str(), prm->id);
-	prm->logcat = atckr_locat;
-
-	aes_prg prg;
-	if(0 != prg.init(BLOCK_SIZE))
-	{
-		log4cpp::Category::getInstance(prm->logcat).error("%s: prg.init() failure", __FUNCTION__);
-		return NULL;
-	}
-
-	int run_flag_value;
-	if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
-	{
-		int errcode = errno;
-		char errmsg[256];
-		log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
-				__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
-		exit(__LINE__);
-	}
-
-	while(0 != run_flag_value && prm->attacks_done < prm->required_attacks)
-	{
-		(*prm->attack)(prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctrs);
-		prm->attacks_done++;
-
-		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
-		{
-			int errcode = errno;
-			char errmsg[256];
-			log4cpp::Category::getInstance(prm->logcat).error("%s: sem_getvalue() failed with error %d : [%s]",
-					__FUNCTION__, errcode, strerror_r(errcode, errmsg, 256));
-			exit(__LINE__);
-		}
-	}
-	for(size_t bit = 0; bit < 64; ++bit)
-	{
-		for(size_t idx = 0; idx < 4; ++idx)
-			log4cpp::Category::getInstance(prm->logcat).debug("%s: bit %lu - ctr_1[%lu]=%lu; ctr_2[%lu]=%lu;",
-					__FUNCTION__, bit, idx, prm->ctrs[bit].ctr_1[idx], idx, prm->ctrs[bit].ctr_2[idx]);
-	}
-	log4cpp::Category::getInstance(prm->logcat).debug("%s: exit.", __FUNCTION__);
-	return NULL;
 }
 
 int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
