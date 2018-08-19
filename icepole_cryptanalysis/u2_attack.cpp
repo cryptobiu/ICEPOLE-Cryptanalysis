@@ -854,7 +854,8 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, cons
 	}
 
 	U2 = 0;
-	double limit = pow(2.0, -9.83);
+	double limit = pow(2.0, -9.79);
+	log4cpp::Category::getInstance(logcat).debug("%s: limit=%.05f;", __FUNCTION__, limit);
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
 		double dev = (bit_ctrs[bit][0] != 0)? fabs( ( double(bit_ctrs[bit][1]) / double(bit_ctrs[bit][0]) ) - 0.5): 0.0;
