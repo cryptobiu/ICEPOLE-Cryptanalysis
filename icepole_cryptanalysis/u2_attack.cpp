@@ -308,7 +308,7 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 			   const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64])
 {
 	u_int64_t P1[2 * BLONG_SIZE], C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+	unsigned long long clen1 = sizeof(C1);
 
 	generate_input_p1(P1, prg, init_state, logcat);
 	crypto_aead_encrypt((unsigned char *)C1, &clen1, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
@@ -320,7 +320,7 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 6, F1, logcat))
 		{
 			u_int64_t P2[2 * BLONG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-			unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
+			unsigned long long clen2 = sizeof(C2);
 
 			generate_input_p2(bit, P1, P2, logcat);
 			crypto_aead_encrypt((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);

@@ -141,24 +141,24 @@ void cryptanalysis()
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
 		return;
 	}
+
+	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
+	{
+		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
+		return;
+	}
 	*/
 
 	u_int64_t init_state[4][5];
 	get_init_block(init_state, key, iv, logcat);
 
-	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], /*U[0]*/init_state[0][4], /*U[3]*/init_state[3][4]))
-	{
-		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
-		return;
-	}
-
-	/*
 	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
 		return;
 	}
 
+	/*
 	log4cpp::Category::getInstance(logcat).notice("%s: attack done; U0=0x%016lX; U1=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
 													__FUNCTION__, U[0], U[1], U[2], U[3]);
 	*/
