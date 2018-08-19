@@ -86,6 +86,8 @@ u_int8_t get_block_row_bits(const u_int64_t * P, const size_t x, const size_t z)
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
 int generate_input_p1(u_int64_t P1[2*BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
 int generate_input_p2(const size_t bit_offset, const u_int64_t P1[2*BLONG_SIZE], u_int64_t P2[2*BLONG_SIZE], const char * logcat);
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count);
+u_int64_t left_rotate(u_int64_t v, size_t r);
 
 int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 			  u_int64_t & U1, const u_int64_t & U0, const u_int64_t & U2, const u_int64_t & U3)
@@ -350,23 +352,22 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 	for(size_t bit = 0; bit < 64; ++bit)
 		U1::validate_generated_input_1(bit, P1, init_state, logcat);
 
-	/*
 	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
+	unsigned long long clen1 = sizeof(C1);
 	crypto_aead_encrypt((unsigned char *)C1, &clen1, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C1+BLONG_SIZE));
 
 	u_int64_t C1_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-	unsigned long long clen1_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
+	unsigned long long clen1_check = sizeof(C1_check);
 	u_int64_t p1_x_state_check[4][5];
 	crypto_aead_encrypt_hack((unsigned char *)C1_check, &clen1_check, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p1_x_state_check);
 
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
 		u_int8_t F1;
-		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 6, F1, logcat))
+		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u1_omega_bits, 6, F1, logcat))
 		{
-			u_int8_t F1_check = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 6);
+			u_int8_t F1_check = xor_state_bits(p1_x_state_check, bit, u1_omega_bits, 6);
 			if(F1_check != F1)
 			{
 				log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - F1_check = %hhu != %hhu = F1.", __FUNCTION__, bit, F1_check, F1);
@@ -380,22 +381,22 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 
 			u_int64_t P2[2 * BLONG_SIZE];
 			generate_input_p2(bit, P1, P2, logcat);
-			U2::validate_generated_input_2(bit, P1, P2, logcat);
+			U1::validate_generated_input_2(bit, P1, P2, logcat);
 
 			u_int64_t C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-			unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
+			unsigned long long clen2 = sizeof(C2);
 			crypto_aead_encrypt((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 			kappa5((unsigned char *)(C2+BLONG_SIZE));
 
 			u_int8_t F2;
-			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u2_omega_bits, 6, F2, logcat))
+			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u1_omega_bits, 6, F2, logcat))
 			{
 				u_int64_t C2_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-				unsigned long long clen2_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
+				unsigned long long clen2_check = sizeof(C2_check);
 				u_int64_t p2_x_state_check[4][5];
 				crypto_aead_encrypt_hack((unsigned char *)C2_check, &clen2_check, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p2_x_state_check);
 
-				u_int8_t F2_check = xor_state_bits(p2_x_state_check, bit, u2_omega_bits, 6);
+				u_int8_t F2_check = xor_state_bits(p2_x_state_check, bit, u1_omega_bits, 6);
 				if(F2_check != F2)
 				{
 					log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - F2_check = %hhu != %hhu = F2.", __FUNCTION__, bit, F2_check, F2);
@@ -410,7 +411,7 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 				}
 			}
 		}
-	}*/
+	}
 	return 0;
 }
 
@@ -787,6 +788,48 @@ int generate_input_p1(u_int64_t P1[2*BLONG_SIZE], aes_prg & prg, const u_int64_t
 
 	//set the 2nd block of P1 to zeroes
 	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
+	return 0;
+}
+
+u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count)
+{
+	u_int8_t result = 0;
+	for(size_t i = 0; i < bit_count; ++i)
+	{
+		u_int64_t integer = state[bits[i].x][bits[i].y];
+		u_int64_t mask = left_rotate(0x1, bits[i].z + bit_offset);
+		result ^= ((integer & mask)? 1: 0);
+	}
+	return result;
+}
+
+u_int64_t left_rotate(u_int64_t v, size_t r)
+{
+	r = r % 64;
+	return (v << r) | (v >> (64-r));
+}
+
+int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat)
+{
+	/* Diff: P1 ^ P2 = the following map -
+	0x0000000000000200L,0x0000000000000200L,0x0000000000000200L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000200L,0x0000000000000200L,0x0000000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000200L,0x0000000000000000L,0x0000000000000200L,0x0000000000000000L
+	0x0000000000000000L,0x0000000000000200L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	[0,0] , [0,1] , [0,2] , [1,1] , [1,2] , [2,1] , [2,3] , [3,1]		 */
+
+	u_int64_t mask = left_rotate(0x200, bit_offset);
+
+	//copy P1 onto P2 and modify the bits by the conversion mask
+	memcpy(P2, P1, 2 * BLOCK_SIZE);
+	RC2I(P2,0,0) ^= mask;
+	RC2I(P2,0,1) ^= mask;
+	RC2I(P2,0,2) ^= mask;
+	RC2I(P2,1,1) ^= mask;
+	RC2I(P2,1,2) ^= mask;
+	RC2I(P2,2,1) ^= mask;
+	RC2I(P2,2,3) ^= mask;
+	RC2I(P2,3,1) ^= mask;
 	return 0;
 }
 
@@ -1220,30 +1263,6 @@ int generate_input_p1(u_int64_t P1[2*BLONG_SIZE], aes_prg & prg, const u_int64_t
 //
 //	//set the 2nd block of P1 to zeroes
 //	memset((u_int8_t *)P1 + BLOCK_SIZE, 0, BLOCK_SIZE);
-//	return 0;
-//}
-//
-//int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat)
-//{
-//	/* Diff: P1 ^ P2 = the following map -
-//	0x0000000000000200L,0x0000000000000200L,0x0000000000000200L,0x0000000000000000L,0x0000000000000000L
-//	0x0000000000000000L,0x0000000000000200L,0x0000000000000200L,0x0000000000000000L,0x0000000000000000L
-//	0x0000000000000000L,0x0000000000000200L,0x0000000000000000L,0x0000000000000200L,0x0000000000000000L
-//	0x0000000000000000L,0x0000000000000200L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
-//	[0,0] , [0,1] , [0,2] , [1,1] , [1,2] , [2,1] , [2,3] , [3,1]		 */
-//
-//	u_int64_t mask = left_rotate(0x200, bit_offset);
-//
-//	//copy P1 onto P2 and modify the bits by the conversion mask
-//	memcpy(P2, P1, 2 * BLOCK_SIZE);
-//	RC2I(P2,0,0) ^= mask;
-//	RC2I(P2,0,1) ^= mask;
-//	RC2I(P2,0,2) ^= mask;
-//	RC2I(P2,1,1) ^= mask;
-//	RC2I(P2,1,2) ^= mask;
-//	RC2I(P2,2,1) ^= mask;
-//	RC2I(P2,2,3) ^= mask;
-//	RC2I(P2,3,1) ^= mask;
 //	return 0;
 //}
 //
