@@ -153,10 +153,10 @@ int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctrs, 0, 64 * sizeof(bit_ctrs_t));
 								atckr_prms[i].attacks_done = 0;
-								atckr_prms[i].required_attacks = (pow(2, 32.4)/thread_count)+1;
+								atckr_prms[i].required_attacks = (pow(2, 22)/thread_count)+1;//(pow(2, 32.4)/thread_count)+1;
 								//atckr_prms[i].attack = the_attack;
-								atckr_prms[i].attack = the_attack_check;
-								//atckr_prms[i].attack = the_attack_hack;
+								//atckr_prms[i].attack = the_attack_check;
+								atckr_prms[i].attack = the_attack_hack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -196,7 +196,6 @@ int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 							}
 							log4cpp::Category::getInstance(locat).notice("%s: all attacker threads are joined.", __FUNCTION__);
 
-							/*
 							guess_work(atckr_prms, U1, locat);
 
 							log4cpp::Category::getInstance(logcat).notice("%s: guessed U1 = 0x%016lX.", __FUNCTION__, U1);
@@ -209,7 +208,6 @@ int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 									if(m & u2cmp) eq_bit_cnt++;
 								log4cpp::Category::getInstance(locat).notice("%s: correct guessed U1 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 							}
-							*/
 
 							result = 0;
 
@@ -411,6 +409,32 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 				}
 			}
 		}
+	}
+	return 0;
+}
+
+int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
+					const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64])
+{
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
+	unsigned long long clen = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
+	u_int64_t p1_x_state[4][5], p2_x_state[4][5];
+
+	generate_input_p1(P1, prg, init_state, logcat);
+	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p1_x_state);
+
+	for(size_t bit = 0; bit < 64; ++bit)
+	{
+		u_int8_t F1, F2;
+		F1 = xor_state_bits(p1_x_state, bit, u1_omega_bits, 6);
+
+		generate_input_p2(bit, P1, P2, logcat);
+		crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p2_x_state);
+		F2 = xor_state_bits(p2_x_state, bit, u1_omega_bits, 6);
+
+		ctrs[bit].ctr_1[0]++;
+		if(F1 == F2)
+			ctrs[bit].ctr_2[0]++;
 	}
 	return 0;
 }
@@ -832,6 +856,40 @@ int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u
 	RC2I(P2,3,1) ^= mask;
 	return 0;
 }
+
+void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U1, const char * logcat)
+{
+	u_int64_t bit_ctrs[64][2];
+	memset(bit_ctrs, 0, 64*2*sizeof(u_int64_t));
+	for(std::vector<attacker_t>::const_iterator atckr = atckr_prms.begin(); atckr != atckr_prms.end(); ++atckr)
+	{
+		for(size_t bit = 0; bit < 64; ++bit)
+		{
+			bit_ctrs[bit][0] += atckr->ctrs[bit].ctr_1[0];
+			bit_ctrs[bit][1] += atckr->ctrs[bit].ctr_2[0];
+		}
+	}
+
+	U1 = 0;
+	double limit = pow(2.0, -10.39);
+	log4cpp::Category::getInstance(logcat).debug("%s: limit=%.05f;", __FUNCTION__, limit);
+	for(size_t bit = 0; bit < 64; ++bit)
+	{
+		double dev = (bit_ctrs[bit][0] != 0)? fabs( ( double(bit_ctrs[bit][1]) / double(bit_ctrs[bit][0]) ) - 0.5): 0.0;
+		log4cpp::Category::getInstance(logcat).debug("%s: bit %lu; ctr_1=%lu; ctr_2=%lu; dev=%.05f;",
+				__FUNCTION__, bit,bit_ctrs[bit][0], bit_ctrs[bit][1], dev);
+		if(limit >= dev)
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: U1 bit %lu = 1", __FUNCTION__, (21 + bit)%64);
+			U1 |= left_rotate(0x1, 21 + bit);
+		}
+		else
+		{
+			log4cpp::Category::getInstance(logcat).debug("%s: U1 bit %lu = 0", __FUNCTION__, (21 + bit)%64);
+		}
+	}
+}
+
 
 }//namespace ATTACK_U1
 
