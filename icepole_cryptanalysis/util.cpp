@@ -65,48 +65,6 @@ void log_state(const char * label, const u_int64_t state[4][5], const char * log
 	}
 }
 
-void sigint_cb(evutil_socket_t, short, void * arg)
-{
-	event_param_t * eprm = (event_param_t *)arg;
-	log4cpp::Category::getInstance(eprm->locat).notice("%s: SIGINT caught; breaking event loop.", __FUNCTION__);
-	event_base_loopbreak(eprm->the_base);
-}
-
-void timer_cb(evutil_socket_t, short, void * arg)
-{
-	event_param_t * eprm = (event_param_t *)arg;
-
-	bool all_attacks_done = true;
-	size_t samples_done, attacks_done;
-	for(size_t i = 0; i < thread_count; ++i)
-	{
-		all_attacks_done = all_attacks_done && ((*eprm->atckr_prms)[i].attacks_done >= (*eprm->atckr_prms)[i].required_attacks);
-		samples_done = (*eprm->atckr_prms)[i].ctr_1[0] +
-					   (*eprm->atckr_prms)[i].ctr_1[1] +
-					   (*eprm->atckr_prms)[i].ctr_1[2] +
-					   (*eprm->atckr_prms)[i].ctr_1[3];
-		attacks_done = (*eprm->atckr_prms)[i].attacks_done;
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: thread %lu collected %lu samples in %lu attacks.",
-				__FUNCTION__, i, samples_done, attacks_done);
-	}
-
-	if(all_attacks_done)
-	{
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: all samples are done for all threads; breaking event loop.", __FUNCTION__);
-		event_base_loopbreak(eprm->the_base);
-		return;
-	}
-
-	time_t now = time(NULL);
-	if(now > (eprm->start_time + allotted_time))
-	{
-		log4cpp::Category::getInstance(eprm->locat).info("%s: start=%lu; allotted=%lu; now=%lu;", __FUNCTION__, eprm->start_time, allotted_time, now);
-		log4cpp::Category::getInstance(eprm->locat).notice("%s: allotted time of %lu seconds is up; breaking event loop.", __FUNCTION__, allotted_time);
-		event_base_loopbreak(eprm->the_base);
-		return;
-	}
-}
-
 u_int64_t left_rotate(u_int64_t v, size_t r)
 {
 	r = r % 64;
@@ -346,41 +304,6 @@ bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bi
 	default: return false;
 	}
 	return false;
-}
-
-bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset,
-							 const block_bit_t * bits, const size_t bit_count,
-							 u_int8_t & F_xor_res, const char * logcat)
-{
-	u_int8_t row_bits, input_bit;
-	F_xor_res = 0;
-
-	for(size_t i = 0; i < bit_count; ++i)
-	{
-		block_bit_t current_bit = bits[i];
-		current_bit.z = (current_bit.z + bit_offset)%64;
-
-		row_bits = get_block_row_bits(P_perm_output, current_bit.x, current_bit.z);
-		input_bit = 0;
-
-		if(lookup_Sbox_input_bit(row_bits, current_bit.y, input_bit))
-			F_xor_res ^= input_bit;
-		else
-			return false;
-	}
-	return true;
-}
-
-u_int8_t xor_state_bits(const u_int64_t state[4][5], const size_t bit_offset, const block_bit_t * bits, const size_t bit_count)
-{
-	u_int8_t result = 0;
-	for(size_t i = 0; i < bit_count; ++i)
-	{
-		u_int64_t integer = state[bits[i].x][bits[i].y];
-		u_int64_t mask = left_rotate(0x1, bits[i].z + bit_offset);
-		result ^= ((integer & mask)? 1: 0);
-	}
-	return result;
 }
 
 //************************************************************************************************//
