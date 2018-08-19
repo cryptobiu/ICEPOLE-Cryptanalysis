@@ -152,7 +152,7 @@ void cryptanalysis()
 	u_int64_t init_state[4][5];
 	get_init_block(init_state, key, iv, logcat);
 
-	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
+	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], init_state[0][4], init_state[2][4], init_state[3][4]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
 		return;
