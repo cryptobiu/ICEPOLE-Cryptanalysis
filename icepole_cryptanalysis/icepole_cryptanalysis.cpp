@@ -153,7 +153,47 @@ void cryptanalysis()
 		return;
 	}
 
-	log4cpp::Category::getInstance(logcat).notice("%s: attack done; U0=0x%016lX; U1=0x%016lX; U2=0x%016lX; U3=0x%016lX;",
-													__FUNCTION__, U[0], U[1], U[2], U[3]);
+	u_int64_t real_init_state[4][5];
+	get_hacked_init_state(real_init_state, key, iv, logcat);
+
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U[0]);
+		log4cpp::Category::getInstance(logcat).notice("%s: actual  U0 = 0x%016lX.", __FUNCTION__, real_init_state[0][4] ^ 3);
+		u_int64_t u0cmp = ~(U[0] ^ (real_init_state[0][4] ^ 3));
+		size_t eq_bit_cnt = 0;
+		for(u_int64_t m = 0x1; m != 0; m <<= 1)
+			if(m & u0cmp) eq_bit_cnt++;
+		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U0 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+	}
+
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: guessed U1 = 0x%016lX.", __FUNCTION__, U[1]);
+		log4cpp::Category::getInstance(logcat).notice("%s: actual  U1 = 0x%016lX.", __FUNCTION__, real_init_state[1][4]);
+		u_int64_t u2cmp = ~(U[1] ^ real_init_state[1][4]);
+		size_t eq_bit_cnt = 0;
+		for(u_int64_t m = 0x1; m != 0; m <<= 1)
+			if(m & u2cmp) eq_bit_cnt++;
+		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U1 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+	}
+
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: guessed U2 = 0x%016lX.", __FUNCTION__, U[2]);
+		log4cpp::Category::getInstance(logcat).notice("%s: actual  U2 = 0x%016lX.", __FUNCTION__, real_init_state[2][4]);
+		u_int64_t u2cmp = ~(U[2] ^ real_init_state[2][4]);
+		size_t eq_bit_cnt = 0;
+		for(u_int64_t m = 0x1; m != 0; m <<= 1)
+			if(m & u2cmp) eq_bit_cnt++;
+		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U2 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+	}
+
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U[3]);
+		log4cpp::Category::getInstance(logcat).notice("%s: actual  U3 = 0x%016lX.", __FUNCTION__, real_init_state[3][4]);
+		u_int64_t u3cmp = ~(U[3] ^ real_init_state[3][4]);
+		size_t eq_bit_cnt = 0;
+		for(u_int64_t m = 0x1; m != 0; m <<= 1)
+			if(m & u3cmp) eq_bit_cnt++;
+		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U3 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+	}
 }
 
