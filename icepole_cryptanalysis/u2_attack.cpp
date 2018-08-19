@@ -858,15 +858,15 @@ void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, cons
 	{
 		double dev = (bit_ctrs[bit][0] != 0)? fabs( ( double(bit_ctrs[bit][1]) / double(bit_ctrs[bit][0]) ) - 0.5): 0.0;
 		log4cpp::Category::getInstance(logcat).debug("%s: bit %lu; ctr_1=%lu; ctr_2=%lu; dev=%.05f;",
-				__FUNCTION__, bit_ctrs[bit][0], bit_ctrs[bit][1], dev);
+				__FUNCTION__, bit, bit_ctrs[bit][0], bit_ctrs[bit][1], dev);
 		if(pow(2.0, -9.83) >= dev)
 		{
-			log4cpp::Category::getInstance(logcat).debug("%s: U2 bit %lu = 1", __FUNCTION__, 27 + bit);
+			log4cpp::Category::getInstance(logcat).debug("%s: U2 bit %lu = 1", __FUNCTION__, left_rotate(0x1, 27 + bit));
 			U2 |= left_rotate(0x1, 27 + bit);
 		}
 		else
 		{
-			log4cpp::Category::getInstance(logcat).debug("%s: U2 bit %lu = 0", __FUNCTION__, 27 + bit);
+			log4cpp::Category::getInstance(logcat).debug("%s: U2 bit %lu = 0", __FUNCTION__, left_rotate(0x1, 27 + bit));
 		}
 	}
 }
