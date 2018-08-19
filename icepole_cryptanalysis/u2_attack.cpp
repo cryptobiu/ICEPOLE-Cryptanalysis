@@ -152,8 +152,8 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 								atckr_prms[i].attacks_done = 0;
 								atckr_prms[i].required_attacks = (pow(2, 22)/thread_count)+1;//(pow(2, 32.7)/thread_count)+1;
 								//atckr_prms[i].attack = the_attack;
-								atckr_prms[i].attack = the_attack_check;
-								//atckr_prms[i].attack = the_attack_hack;
+								//atckr_prms[i].attack = the_attack_check;
+								atckr_prms[i].attack = the_attack_hack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -412,31 +412,26 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
 					const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64])
 {
-	u_int64_t P1[2 * BLONG_SIZE], C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
-	u_int64_t p1_x_state_check[4][5];
+	u_int64_t P1[2 * BLONG_SIZE], P2[2 * BLONG_SIZE], C[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
+	unsigned long long clen = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
+	u_int64_t x_state[4][5];
 
 	generate_input_p1(P1, prg, init_state, logcat);
-	crypto_aead_encrypt_hack((unsigned char *)C1, &clen1, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p1_x_state_check);
+	crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
 
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
 		u_int8_t F1, F2;
-		F1 = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 6);
-
-		u_int64_t P2[2 * BLONG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-		unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
-		u_int64_t p2_x_state_check[4][5];
+		F1 = xor_state_bits(x_state, bit, u2_omega_bits, 6);
 
 		generate_input_p2(bit, P1, P2, logcat);
-		crypto_aead_encrypt_hack((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p2_x_state_check);
-		F2 = xor_state_bits(p2_x_state_check, bit, u2_omega_bits, 6);
+		crypto_aead_encrypt_hack((unsigned char *)C, &clen, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, x_state);
+		F2 = xor_state_bits(x_state, bit, u2_omega_bits, 6);
 
 		ctrs[bit].ctr_1[0]++;
 		if(F1 == F2)
 			ctrs[bit].ctr_2[0]++;
 	}
-
 	return 0;
 }
 
