@@ -17,14 +17,10 @@
 #include "aes_prg.h"
 #include "attack_validation.h"
 #include "icepole128av2/ref/encrypt.h"
+#include "util.h"
 
 namespace ATTACK_U03
 {
-#define KEY_SIZE			16
-#define BLOCK_SIZE			128
-#define BLONG_SIZE			16
-#define ICEPOLE_TAG_SIZE	16
-#define RC2I(arr,x,y) arr[x + 4*y]
 
 typedef struct
 {
@@ -74,10 +70,6 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 void v_extract(const std::vector<attacker_t> & atckr_prms, u_int8_t v[64][2], const char * logcat);
 void get_init_state(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat);
-u_int64_t left_rotate(u_int64_t v, size_t r);
-void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat, const int level);
-void log_block(const char * label, const u_int64_t * block, const char * logcat, const int level);
-void log_state(const char * label, const u_int64_t state[4][5], const char * logcat, const int level);
 void sigint_cb(evutil_socket_t, short, void * arg);
 void timer_cb(evutil_socket_t, short, void * arg);
 int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
@@ -149,10 +141,10 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctrs, 0, 64 * sizeof(bit_ctrs_t));
 								atckr_prms[i].attacks_done = 0;
-								atckr_prms[i].required_attacks = (pow(2, 33.7)/thread_count)+1;
-								atckr_prms[i].attack = the_attack;
+								atckr_prms[i].required_attacks = (pow(2, 23)/thread_count)+1;//(pow(2, 33.7)/thread_count)+1;
+								//atckr_prms[i].attack = the_attack;
 								//atckr_prms[i].attack = the_attack_check;
-								//atckr_prms[i].attack = the_attack_hack;
+								atckr_prms[i].attack = the_attack_hack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];
@@ -547,62 +539,6 @@ void get_init_state(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * i
 				}
 			}
 		}
-	}
-}
-
-u_int64_t left_rotate(u_int64_t v, size_t r)
-{
-	r = r % 64;
-	return (v << r) | (v >> (64-r));
-}
-
-void log_buffer(const char * label, const u_int8_t * buffer, const size_t size, const char * logcat, const int level)
-{
-	if(log4cpp::Category::getInstance(logcat).isPriorityEnabled(level))
-	{
-		std::stringstream srs;
-		srs << std::hex << std::setfill('0');
-		for(size_t i = 0; i < size; ++i)
-			srs << std::setw(2) << static_cast<unsigned>(buffer[i]);
-		log4cpp::Category::getInstance(logcat).log(level, "%s: [%s]", label, srs.str().c_str());
-	}
-}
-
-void log_block(const char * label, const u_int64_t * block, const char * logcat, const int level)
-{
-	if(log4cpp::Category::getInstance(logcat).isPriorityEnabled(level))
-	{
-		std::string str;
-		char buffer[64];
-		for(int i = 0; i < 4; ++i)
-		{
-			for(int j = 0; j < 4; ++j)
-			{
-				snprintf(buffer, 64, "%016lX ", RC2I(block, i, j));
-				str += buffer;
-			}
-			str += '\n';
-		}
-		log4cpp::Category::getInstance(logcat).log(level, "%s:\n%s", label, str.c_str());
-	}
-}
-
-void log_state(const char * label, const u_int64_t state[4][5], const char * logcat, const int level)
-{
-	if(log4cpp::Category::getInstance(logcat).isPriorityEnabled(level))
-	{
-		std::string str;
-		char buffer[64];
-		for(int i = 0; i < 4; ++i)
-		{
-			for(int j = 0; j < 5; ++j)
-			{
-				snprintf(buffer, 64, "%016lX ", state[i][j]);
-				str += buffer;
-			}
-			str += '\n';
-		}
-		log4cpp::Category::getInstance(logcat).log(level, "%s:\n%s", label, str.c_str());
 	}
 }
 
