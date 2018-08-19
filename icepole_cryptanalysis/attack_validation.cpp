@@ -408,6 +408,58 @@ void validate_generated_input_1(const size_t bit_offset, const u_int64_t * P, co
 	log4cpp::Category::getInstance(logcat).info("%s: generated input 5 constraints check out for bit %lu.", __FUNCTION__, bit_offset);
 }
 
+int validate_inputs_diff(const size_t bit_offset, int i, int j, const u_int64_t P1v, const u_int64_t P2v, const char * logcat)
+{
+	/* Diff: P1 ^ P2 = the following map -
+	0x0000000000000000L,0x0040000000000000L,0x0000000000000000L,0x0040000000000000L,0x0000000000000000L
+	0x0040000000000000L,0x0040000000000000L,0x0000000000000000L,0x0040000000000000L,0x0000000000000000L
+	0x0000000000000000L,0x0040000000000000L,0x0040000000000000L,0x0040000000000000L,0x0000000000000000L
+	0x0040000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L,0x0000000000000000L
+	*/
+
+	u_int64_t positive = left_rotate(0x0040000000000000, bit_offset);
+	switch(j)
+	{
+	case 0:
+		if((i%2 != 0) && (P1v^P2v) != positive)
+			return -1;
+		break;
+	case 1:
+		if((i != 3) && (P1v^P2v) != positive)
+			return -1;
+		break;
+	case 2:
+		if((i == 2) && (P1v^P2v) != positive)
+			return -1;
+		break;
+	case 3:
+		if((i != 3) && (P1v^P2v) != positive)
+			return -1;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+void validate_generated_input_2(const size_t bit_offset, const u_int64_t * P1, const u_int64_t * P2, const char * logcat)
+{
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 4; ++j)
+		{
+			if(0 != validate_inputs_diff(bit_offset, i, j, RC2I(P1,i,j), RC2I(P2,i,j), logcat))
+			{
+				log4cpp::Category::getInstance(logcat).fatal("%s: generated inputs diff violation @[%d:%d]; id=%lu.", __FUNCTION__, i, j, bit_offset);
+				log_block("P1", P1, logcat, 0);
+				log_block("P2", P2, logcat, 0);
+				exit(-1);
+			}
+		}
+	}
+	log4cpp::Category::getInstance(logcat).info("%s: generated inputs XOR diff check out.", __FUNCTION__);
+}
+
 }//namespace U2
 
 namespace U1

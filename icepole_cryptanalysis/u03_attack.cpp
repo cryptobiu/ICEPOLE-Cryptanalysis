@@ -359,12 +359,12 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 
 	u_int8_t F1, counter_bits[64];
 	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt((unsigned char *)C1, &clen1, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C1+BLONG_SIZE));
 	lookup_counter_bits(C1, counter_bits);
 
-	unsigned long long clen1_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+	unsigned long long clen1_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
 	u_int64_t C1_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 	u_int64_t p1_x_state_check[4][5];
 	u_int8_t F1_check;

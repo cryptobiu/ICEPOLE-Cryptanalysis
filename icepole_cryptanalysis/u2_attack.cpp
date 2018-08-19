@@ -79,7 +79,7 @@ void sigint_cb(evutil_socket_t, short, void * arg);
 void timer_cb(evutil_socket_t, short, void * arg);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U2, const char * logcat);
 int generate_input_p1(u_int64_t P1[2*BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5], const char * logcat);
-int generate_input_p2(const size_t thd_id, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
+int generate_input_p2(const size_t bit_offset, const u_int64_t P1[2 * BLONG_SIZE], u_int64_t P2[2 * BLONG_SIZE], const char * logcat);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset,
 							 const block_bit_t * bits, const size_t bit_count,
 							 u_int8_t & F_xor_res, const char * logcat);
@@ -150,7 +150,7 @@ int attack_u2(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctrs, 0, 64 * sizeof(bit_ctrs_t));
 								atckr_prms[i].attacks_done = 0;
-								atckr_prms[i].required_attacks = 10;//(pow(2, 22)/thread_count)+1;//(pow(2, 32.7)/thread_count)+1;
+								atckr_prms[i].required_attacks = (pow(2, 22)/thread_count)+1;//(pow(2, 32.7)/thread_count)+1;
 								//atckr_prms[i].attack = the_attack;
 								atckr_prms[i].attack = the_attack_check;
 								//atckr_prms[i].attack = the_attack_hack;
@@ -285,7 +285,6 @@ void * attacker(void * arg)
 	{
 		(*prm->attack)(prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctrs);
 		prm->attacks_done++;
-		log4cpp::Category::getInstance(prm->logcat).debug("%s: %lu attacks done.", __FUNCTION__, prm->attacks_done);
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))
 		{
@@ -322,7 +321,7 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 6, F1, logcat))
 		{
 			u_int64_t P2[2 * BLONG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-			unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+			unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
 
 			generate_input_p2(bit, P1, P2, logcat);
 			crypto_aead_encrypt((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
@@ -347,27 +346,22 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 	for(size_t bit = 0; bit < 64; ++bit)
 		U2::validate_generated_input_1(bit, P1, init_state, logcat);
 
-	log4cpp::Category::getInstance(logcat).debug("%s: encrypting P1.", __FUNCTION__);
-
-	u_int8_t F1;
-	u_int8_t C1[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE];
+	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
 	crypto_aead_encrypt((unsigned char *)C1, &clen1, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 	kappa5((unsigned char *)(C1+BLONG_SIZE));
 
-	u_int8_t F1_check;
-	u_int8_t C1_check[2*BLOCK_SIZE + ICEPOLE_TAG_SIZE];
+	u_int64_t C1_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 	unsigned long long clen1_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
 	u_int64_t p1_x_state_check[4][5];
 	crypto_aead_encrypt_hack((unsigned char *)C1_check, &clen1_check, (const unsigned char *)P1, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p1_x_state_check);
 
-	log4cpp::Category::getInstance(logcat).debug("%s: encrypting P1 done.", __FUNCTION__);
-
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
-		if(last_Sbox_lookup_filter((const u_int64_t*)(C1+BLOCK_SIZE), bit, u2_omega_bits, 6, F1, logcat))
+		u_int8_t F1;
+		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 6, F1, logcat))
 		{
-			F1_check = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 6);
+			u_int8_t F1_check = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 6);
 			if(F1_check != F1)
 			{
 				log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - F1_check = %hhu != %hhu = F1.", __FUNCTION__, bit, F1_check, F1);
@@ -381,23 +375,22 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 
 			u_int64_t P2[2 * BLONG_SIZE];
 			generate_input_p2(bit, P1, P2, logcat);
-			U03::validate_generated_input_2(bit, P1, P2, logcat);
+			U2::validate_generated_input_2(bit, P1, P2, logcat);
 
 			u_int64_t C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-			unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+			unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
 			crypto_aead_encrypt((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 			kappa5((unsigned char *)(C2+BLONG_SIZE));
 
 			u_int8_t F2;
 			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u2_omega_bits, 6, F2, logcat))
 			{
-				unsigned long long clen2_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
 				u_int64_t C2_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
+				unsigned long long clen2_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;
 				u_int64_t p2_x_state_check[4][5];
-				u_int8_t F2_check;
-
 				crypto_aead_encrypt_hack((unsigned char *)C2_check, &clen2_check, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p2_x_state_check);
-				F2_check = xor_state_bits(p2_x_state_check, bit, u2_omega_bits, 6);
+
+				u_int8_t F2_check = xor_state_bits(p2_x_state_check, bit, u2_omega_bits, 6);
 				if(F2_check != F2)
 				{
 					log4cpp::Category::getInstance(logcat).fatal("%s: bit %lu - F2_check = %hhu != %hhu = F2.", __FUNCTION__, bit, F2_check, F2);
@@ -636,7 +629,7 @@ int generate_input_p1(u_int64_t P1[2*BLONG_SIZE], aes_prg & prg, const u_int64_t
 	return 0;
 }
 
-int generate_input_p2(const size_t bit_offset, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat)
+int generate_input_p2(const size_t bit_offset, const u_int64_t P1[2 * BLONG_SIZE], u_int64_t P2[2 * BLONG_SIZE], const char * logcat)
 {
 	/* Diff: P1 ^ P2 = the following map -
 	0x0000000000000000L,0x0040000000000000L,0x0000000000000000L,0x0040000000000000L,0x0000000000000000L
