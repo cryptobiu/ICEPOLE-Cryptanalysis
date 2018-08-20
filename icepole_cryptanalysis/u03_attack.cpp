@@ -37,15 +37,12 @@ int generate_input_p1(u_int64_t P1[BLONG_SIZE], aes_prg & prg, const u_int64_t i
 int generate_input_p2(const size_t thd_id, const u_int64_t P1[BLONG_SIZE], u_int64_t P2[BLONG_SIZE], const char * logcat);
 void lookup_counter_bits(const u_int64_t * C, u_int8_t ctr_idx[64]);
 
-int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t & U0, u_int64_t & U3)
+int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, u_int64_t init_state[4][5], u_int64_t & U0, u_int64_t & U3)
 {
 	int result = -1;
 
 	char locat[32];
 	snprintf(locat, 32, "%s.u03", logcat);
-
-	u_int64_t init_state[4][5];
-	get_honest_init_state(init_state, key, iv, logcat);
 
 	std::vector<attacker_t> atckr_prms(thread_count);
 

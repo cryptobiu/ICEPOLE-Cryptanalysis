@@ -138,7 +138,10 @@ void cryptanalysis()
 	u_int64_t real_init_state[4][5];
 	get_hacked_init_state(real_init_state, key, iv, logcat);
 
-	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, U[0], U[3]))
+	u_int64_t init_state[4][5];
+	get_honest_init_state(init_state, key, iv, logcat);
+
+	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, init_state, U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
 		return;
