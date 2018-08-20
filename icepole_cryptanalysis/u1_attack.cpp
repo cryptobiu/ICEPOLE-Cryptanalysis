@@ -98,10 +98,10 @@ int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 								memcpy(atckr_prms[i].init_state, init_state, 4*5*sizeof(u_int64_t));
 								memset(atckr_prms[i].ctrs, 0, 64 * sizeof(bit_ctrs_t));
 								atckr_prms[i].attacks_done = 0;
-								atckr_prms[i].required_attacks = (pow(2, 22)/thread_count)+1;//(pow(2, 32.4)/thread_count)+1;
-								//atckr_prms[i].attack = the_attack;
+								atckr_prms[i].required_attacks = (pow(2, 32.4)/thread_count)+1;
+								atckr_prms[i].attack = the_attack;
 								//atckr_prms[i].attack = the_attack_check;
-								atckr_prms[i].attack = the_attack_hack;
+								//atckr_prms[i].attack = the_attack_hack;
 								if(0 != (errcode = pthread_create(atckr_thds.data() + i, NULL, attacker, (void *)(atckr_prms.data() + i))))
 								{
 									char errmsg[256];

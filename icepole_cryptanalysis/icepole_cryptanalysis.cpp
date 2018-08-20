@@ -118,8 +118,6 @@ void init_log(const char * a_log_file, const char * a_log_dir, const int log_lev
 
 void cryptanalysis()
 {
-	u_int8_t key[KEY_SIZE], iv[KEY_SIZE];
-
 	aes_prg prg;
 	if(0 != prg.init(BLOCK_SIZE))
 	{
@@ -127,6 +125,7 @@ void cryptanalysis()
 		return;
 	}
 
+	u_int8_t key[KEY_SIZE], iv[KEY_SIZE];
 	prg.gen_rand_bytes(key, KEY_SIZE);
 	log_buffer("Selected key", key, KEY_SIZE, logcat, 700);
 	prg.gen_rand_bytes(iv, KEY_SIZE);
@@ -144,6 +143,18 @@ void cryptanalysis()
 	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, init_state, U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
+		return;
+	}
+
+	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
+	{
+		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
+		return;
+	}
+
+	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
+	{
+		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
 		return;
 	}
 
@@ -167,12 +178,6 @@ void cryptanalysis()
 		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U3 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 	}
 
-	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
-	{
-		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
-		return;
-	}
-
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: guessed U2 = 0x%016lX.", __FUNCTION__, U[2]);
 		log4cpp::Category::getInstance(logcat).notice("%s: actual  U2 = 0x%016lX.", __FUNCTION__, real_init_state[2][4]);
@@ -181,13 +186,6 @@ void cryptanalysis()
 		for(u_int64_t m = 0x1; m != 0; m <<= 1)
 			if(m & u2cmp) eq_bit_cnt++;
 		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U2 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
-	}
-
-	/*
-	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
-	{
-		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
-		return;
 	}
 
 	{
@@ -199,6 +197,5 @@ void cryptanalysis()
 			if(m & u2cmp) eq_bit_cnt++;
 		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U1 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 	}
-	*/
 }
 
