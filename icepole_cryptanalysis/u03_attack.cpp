@@ -303,7 +303,7 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 					const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64])
 {
 	u_int64_t P1[2 * BLONG_SIZE], C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-	unsigned long long clen1 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+	unsigned long long clen1 = sizeof(C1);
 	u_int8_t counter_bits[64];
 	u_int64_t p1_x_state_check[4][5];
 
@@ -317,7 +317,7 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 		F1 = xor_state_bits(p1_x_state_check, bit, u3_omega_bits, 8);
 
 		u_int64_t P2[2 * BLONG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-		unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+		unsigned long long clen2 = sizeof(C2);
 		u_int64_t p2_x_state_check[4][5];
 
 		generate_input_p2(bit, P1, P2, logcat);
