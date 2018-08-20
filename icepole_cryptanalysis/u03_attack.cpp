@@ -264,15 +264,15 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 			U03::validate_generated_input_2(bit, P1, P2, logcat);
 
 			u_int64_t C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
-			unsigned long long clen2 = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
+			unsigned long long clen2 = sizeof(C2);
 			crypto_aead_encrypt((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 			kappa5((unsigned char *)(C2+BLONG_SIZE));
 
 			u_int8_t F2;
 			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u3_omega_bits, 8, F2, logcat))
 			{
-				unsigned long long clen2_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t);
 				u_int64_t C2_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
+				unsigned long long clen2_check = sizeof(C2_check);
 				u_int64_t p2_x_state_check[4][5];
 				u_int8_t F2_check;
 
