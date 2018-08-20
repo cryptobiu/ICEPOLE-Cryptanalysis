@@ -138,7 +138,6 @@ void cryptanalysis()
 	u_int64_t real_init_state[4][5];
 	get_hacked_init_state(real_init_state, key, iv, logcat);
 
-	/*
 	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
@@ -164,8 +163,8 @@ void cryptanalysis()
 			if(m & u3cmp) eq_bit_cnt++;
 		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U3 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 	}
-	*/
 
+	/*
 	U[0] = real_init_state[0][4] ^ 3;
 	U[3] = real_init_state[3][4];
 
@@ -184,6 +183,7 @@ void cryptanalysis()
 			if(m & u2cmp) eq_bit_cnt++;
 		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U2 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 	}
+	*/
 
 	/*
 	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
