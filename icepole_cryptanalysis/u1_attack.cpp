@@ -43,6 +43,7 @@ int attack_u1(const char * logcat, const u_int8_t * key, const u_int8_t * iv,
 	char locat[32];
 	snprintf(locat, 32, "%s.u1", logcat);
 
+	log4cpp::Category::getInstance(logcat).debug("%s: provided: U0 = 0x%016lX; U2 = 0x%016lX; U3 = 0x%016lX;", __FUNCTION__, U0, U2, U3);
 	u_int64_t init_state[4][5];
 	get_honest_init_state(init_state, key, iv, logcat);
 	init_state[0][4] = U0;
