@@ -203,7 +203,7 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
 		u_int8_t F1, F2;
-		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 6, F1, logcat))
+		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 6, F1))
 		{
 			u_int64_t P2[2 * BLONG_SIZE], C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 			unsigned long long clen2 = sizeof(C2);
@@ -211,7 +211,7 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 			generate_input_p2(bit, P1, P2, logcat);
 			crypto_aead_encrypt((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key);
 			kappa5((unsigned char *)(C2+BLONG_SIZE));
-			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u2_omega_bits, 6, F2, logcat))
+			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u2_omega_bits, 6, F2))
 			{
 				ctrs[bit].ctr_1[0]++;
 				if(F1 == F2)
@@ -244,7 +244,7 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 	for(size_t bit = 0; bit < 64; ++bit)
 	{
 		u_int8_t F1;
-		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 6, F1, logcat))
+		if(last_Sbox_lookup_filter((C1+BLONG_SIZE), bit, u2_omega_bits, 6, F1))
 		{
 			u_int8_t F1_check = xor_state_bits(p1_x_state_check, bit, u2_omega_bits, 6);
 			if(F1_check != F1)
@@ -268,7 +268,7 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 			kappa5((unsigned char *)(C2+BLONG_SIZE));
 
 			u_int8_t F2;
-			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u2_omega_bits, 6, F2, logcat))
+			if(last_Sbox_lookup_filter((C2+BLONG_SIZE), bit, u2_omega_bits, 6, F2))
 			{
 				u_int64_t C2_check[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 				unsigned long long clen2_check = 2 * BLOCK_SIZE + ICEPOLE_TAG_SIZE;

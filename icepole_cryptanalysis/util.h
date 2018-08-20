@@ -55,8 +55,7 @@ void timer_cb(evutil_socket_t, short, void * arg);
 void get_honest_init_state(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat);
 void get_hacked_init_state(u_int64_t is[4][5], const u_int8_t * key, const u_int8_t * iv, const char * logcat);
 bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_offset,
-							 const block_bit_t * bits, const size_t bit_count,
-							 u_int8_t & F_xor_res, const char * logcat);
+							 const block_bit_t * bits, const size_t bit_count, u_int8_t & F_xor_res);
 u_int8_t get_block_bit(const u_int64_t * P, const size_t x, const size_t y, const size_t z);
 u_int8_t get_block_row_bits(const u_int64_t * P, const size_t x, const size_t z);
 bool lookup_Sbox_input_bit(const u_int8_t output_row_bits, const size_t input_bit_index, u_int8_t & input_bit);
