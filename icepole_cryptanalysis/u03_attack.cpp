@@ -191,7 +191,6 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 {
 	u_int64_t P1[2 * BLONG_SIZE];
 	generate_input_p1(P1, prg, init_state);
-	for(size_t bit = 0; bit < 64; ++bit) U03::validate_generated_input_1(bit, P1, init_state, logcat);
 
 	u_int64_t C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 	unsigned long long clen1 = sizeof(C1);
@@ -208,7 +207,6 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 		{
 			u_int64_t P2[2 * BLONG_SIZE];
 			generate_input_p2(bit, P1, P2);
-			U03::validate_generated_input_2(bit, P1, P2, logcat);
 
 			u_int64_t C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 			unsigned long long clen2 = sizeof(C2);
