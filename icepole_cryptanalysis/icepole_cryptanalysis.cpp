@@ -135,26 +135,14 @@ void cryptanalysis()
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
 
+	u_int64_t real_init_state[4][5];
+	get_hacked_init_state(real_init_state, key, iv, logcat);
+
 	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, U[0], U[3]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
 		return;
 	}
-
-	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
-	{
-		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
-		return;
-	}
-
-	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
-	{
-		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
-		return;
-	}
-
-	u_int64_t real_init_state[4][5];
-	get_hacked_init_state(real_init_state, key, iv, logcat);
 
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U[0]);
@@ -167,13 +155,19 @@ void cryptanalysis()
 	}
 
 	{
-		log4cpp::Category::getInstance(logcat).notice("%s: guessed U1 = 0x%016lX.", __FUNCTION__, U[1]);
-		log4cpp::Category::getInstance(logcat).notice("%s: actual  U1 = 0x%016lX.", __FUNCTION__, real_init_state[1][4]);
-		u_int64_t u2cmp = ~(U[1] ^ real_init_state[1][4]);
+		log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U[3]);
+		log4cpp::Category::getInstance(logcat).notice("%s: actual  U3 = 0x%016lX.", __FUNCTION__, real_init_state[3][4]);
+		u_int64_t u3cmp = ~(U[3] ^ real_init_state[3][4]);
 		size_t eq_bit_cnt = 0;
 		for(u_int64_t m = 0x1; m != 0; m <<= 1)
-			if(m & u2cmp) eq_bit_cnt++;
-		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U1 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+			if(m & u3cmp) eq_bit_cnt++;
+		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U3 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+	}
+
+	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
+	{
+		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
+		return;
 	}
 
 	{
@@ -186,14 +180,20 @@ void cryptanalysis()
 		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U2 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 	}
 
+	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
 	{
-		log4cpp::Category::getInstance(logcat).notice("%s: guessed U3 = 0x%016lX.", __FUNCTION__, U[3]);
-		log4cpp::Category::getInstance(logcat).notice("%s: actual  U3 = 0x%016lX.", __FUNCTION__, real_init_state[3][4]);
-		u_int64_t u3cmp = ~(U[3] ^ real_init_state[3][4]);
+		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
+		return;
+	}
+
+	{
+		log4cpp::Category::getInstance(logcat).notice("%s: guessed U1 = 0x%016lX.", __FUNCTION__, U[1]);
+		log4cpp::Category::getInstance(logcat).notice("%s: actual  U1 = 0x%016lX.", __FUNCTION__, real_init_state[1][4]);
+		u_int64_t u2cmp = ~(U[1] ^ real_init_state[1][4]);
 		size_t eq_bit_cnt = 0;
 		for(u_int64_t m = 0x1; m != 0; m <<= 1)
-			if(m & u3cmp) eq_bit_cnt++;
-		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U3 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
+			if(m & u2cmp) eq_bit_cnt++;
+		log4cpp::Category::getInstance(logcat).notice("%s: correct guessed U1 bits count = %lu.", __FUNCTION__, eq_bit_cnt);
 	}
 }
 
