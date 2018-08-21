@@ -35,12 +35,12 @@ int aes_prg::init(const size_t chunk_size, const u_int8_t * key, const u_int8_t 
 	else
 		RAND_bytes(m_iv, KSIZE);
 
-	m_ctx = new EVP_CIPHER_CTX();
+	m_ctx = EVP_CIPHER_CTX_new();
 	EVP_CIPHER_CTX_init(m_ctx);
 	if(1 != EVP_EncryptInit(m_ctx, EVP_aes_128_ecb(), m_key, m_iv))
 	{
 		EVP_CIPHER_CTX_cleanup(m_ctx);
-		delete m_ctx;
+		EVP_CIPHER_CTX_free(m_ctx);
 		m_ctx = NULL;
 		return -1;
 	}
@@ -75,7 +75,7 @@ void aes_prg::term()
 	if(NULL != m_ctx)
 	{
 		EVP_CIPHER_CTX_cleanup(m_ctx);
-		delete m_ctx;
+		EVP_CIPHER_CTX_free(m_ctx);
 		m_ctx = NULL;
 	}
 
