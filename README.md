@@ -20,7 +20,7 @@ This program implements the specified attack in 3 phases:
 - U2 phase - in this second phase the value of U2 is recovered.
 - U1 phase - in this third phase the value of U1 is recovered.
 
-The program's main thread runs each phase at a turn. Since the results of each phase (i.e. the recovered values) are required by the subsequent phases, the three phases must run sequentially.
+The program's main thread runs each phase in turn. Since the results of each phase (i.e. the recovered values) are required by the subsequent phases, the three phases must run sequentially.
 Each phase attack function launches 64 threads of attack, thus utilizing the 64 cores of the selected machine. Naturally the value of the attack threads constant can be changed (in compile time) in order to fit a machine with a different number of cores.
 Each attack thread performs its share of the work and once all threads are done the results are summed and the target value is guessed based on the accumulated results.
 
