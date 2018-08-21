@@ -4,8 +4,6 @@ The following C/C++ project is an implementation of the specified attack. It con
 - icepole - a clone of [ICEPOLE] implementation that is packed in a statically linked library.
 - icepole_cryptanalysis - a program that implements the attack on ICEPOLE.
 
-
-icepole128av2
 ## icepole
 The icepole implementation code, forked off from [ICEPOLE], contains 3 implemented versions:
 - icepole128av2.
