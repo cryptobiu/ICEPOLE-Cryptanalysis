@@ -1,11 +1,9 @@
 # ICEPOLE Cryptanalysis
 
-Copyright (c) 2018, Bar Ilan Cryptography Research Group. All rights reserved. See License.txt
-
 The __icepole_attack_20180814.pdf__ document specifies a method to uncover the key and nonce used with ICEPOLE encryption.
 The following C/C++ project is an implementation of the specified attack. It consists of 2 projects:
-- icepole - a clone of [ICEPOLE] implementation that is packed in a statically linked library.
-- icepole_cryptanalysis - a program that implements the attack on ICEPOLE.
+- icepole - a clone of [ICEPOLE] implementation that is packed in a statically linked library. __Subject to the original licanse/copyright within the project__.
+- icepole_cryptanalysis - a program that implements the attack on ICEPOLE. Copyright (c) 2018, Bar Ilan Cryptography Research Group. All rights reserved. See License.txt
 
 ## icepole
 The icepole implementation code, forked off from [ICEPOLE], contains 3 implemented versions:
