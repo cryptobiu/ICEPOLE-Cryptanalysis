@@ -143,6 +143,7 @@ void cryptanalysis()
 	u_int64_t init_state[4][5];
 	get_honest_init_state(init_state, key, iv, logcat);
 
+	/*
 	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, init_state, U[0], U[3], generated_p2s[0]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
@@ -154,6 +155,10 @@ void cryptanalysis()
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
 		return;
 	}
+	*/
+	U[0] = real_init_state[0][4] ^ 3;
+	U[2] = real_init_state[2][4];
+	U[3] = real_init_state[3][4];
 
 	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3], generated_p2s[2]))
 	{
