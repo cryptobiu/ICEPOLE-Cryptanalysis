@@ -22,9 +22,10 @@ typedef struct
 	u_int64_t init_state[4][5];
 	bit_ctrs_t ctrs[64];
 	size_t required_attacks, attacks_done;
+	size_t generated_p2s;
 
 	int (*attack)(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-				  const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64]);
+				  const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64], u_int64_t & generated_p2s);
 }attacker_t;
 
 typedef struct

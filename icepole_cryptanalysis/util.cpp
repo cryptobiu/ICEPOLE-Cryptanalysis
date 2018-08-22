@@ -110,7 +110,7 @@ void * attacker(void * arg)
 
 	while(0 != run_flag_value && prm->attacks_done < prm->required_attacks)
 	{
-		(*prm->attack)(prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctrs);
+		(*prm->attack)(prm->logcat.c_str(), prm->key, prm->iv, prm->init_state, prg, prm->ctrs, prm->generated_p2s);
 		prm->attacks_done++;
 
 		if(0 != sem_getvalue(prm->run_flag, &run_flag_value))

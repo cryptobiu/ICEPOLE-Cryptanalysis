@@ -26,18 +26,18 @@ static const block_bit_t u3_omega_bits[8] = { 	{0, 0, 51}, {0, 1, 33}, {0, 3, 12
 												{2, 1, 54}, {2, 2, 30}, {3, 2, 10}, {3, 3, 25} };
 
 int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-			   const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64]);
+			   const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64], u_int64_t & generated_p2s);
 int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-			   	     const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64]);
+			   	     const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64], u_int64_t & generated_p2s);
 int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-			   	    const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64]);
+			   	    const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64], u_int64_t & generated_p2s);
 void guess_work(const std::vector<attacker_t> & atckr_prms, u_int64_t & U0, u_int64_t & U3, const char * logcat);
 void v_extract(const std::vector<attacker_t> & atckr_prms, u_int8_t v[64][2], const char * logcat);
 int generate_input_p1(u_int64_t P1[2*BLONG_SIZE], aes_prg & prg, const u_int64_t init_state[4][5]);
 int generate_input_p2(const size_t bit_offset, const u_int64_t P1[2*BLONG_SIZE], u_int64_t P2[2*BLONG_SIZE]);
 void lookup_counter_bits(const u_int64_t * C, u_int8_t ctr_idx[64]);
 
-int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, const u_int64_t init_state[4][5], u_int64_t & U0, u_int64_t & U3)
+int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, const u_int64_t init_state[4][5], u_int64_t & U0, u_int64_t & U3, size_t & generated_p2s)
 {
 	int result = -1;
 
@@ -92,6 +92,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, c
 								memset(atckr_prms[i].ctrs, 0, 64 * sizeof(bit_ctrs_t));
 								atckr_prms[i].attacks_done = 0;
 								atckr_prms[i].required_attacks = (pow(2, 32.7)/thread_count)+1;
+								atckr_prms[i].generated_p2s = 0;
 								atckr_prms[i].attack = the_attack;
 								//atckr_prms[i].attack = the_attack_check;
 								//atckr_prms[i].attack = the_attack_hack;
@@ -120,6 +121,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, c
 							}
 							log4cpp::Category::getInstance(locat).notice("%s: attacker thread run signal is down.", __FUNCTION__);
 
+							generated_p2s = 0;
 							for(size_t i = 0; i < thread_count; ++i)
 							{
 								void * retval = NULL;
@@ -131,6 +133,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, c
 									exit(__LINE__);
 								}
 								log4cpp::Category::getInstance(locat).debug("%s: attacker thread %lu joined.", __FUNCTION__, i);
+								generated_p2s += atckr_prms[i].generated_p2s;
 							}
 							log4cpp::Category::getInstance(locat).notice("%s: all attacker threads are joined.", __FUNCTION__);
 
@@ -187,7 +190,7 @@ int attack_u03(const char * logcat, const u_int8_t * key, const u_int8_t * iv, c
 }
 
 int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-			   const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64])
+			   const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64], u_int64_t & generated_p2s)
 {
 	u_int64_t P1[2 * BLONG_SIZE];
 	generate_input_p1(P1, prg, init_state);
@@ -207,6 +210,7 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 		{
 			u_int64_t P2[2 * BLONG_SIZE];
 			generate_input_p2(bit, P1, P2);
+			generated_p2s++;
 
 			u_int64_t C2[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 			unsigned long long clen2 = sizeof(C2);
@@ -226,7 +230,7 @@ int the_attack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t
 }
 
 int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-					 const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64])
+					 const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64], u_int64_t & generated_p2s)
 {
 	u_int64_t P1[2 * BLONG_SIZE];
 	generate_input_p1(P1, prg, init_state);
@@ -266,6 +270,7 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 
 			u_int64_t P2[2 * BLONG_SIZE];
 			generate_input_p2(bit, P1, P2);
+			generated_p2s++;
 			U03::validate_generated_input_2(bit, P1, P2, logcat);
 
 			u_int64_t C2_chk[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
@@ -305,7 +310,7 @@ int the_attack_check(const char * logcat, const u_int8_t key[KEY_SIZE], const u_
 }
 
 int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_int8_t iv[KEY_SIZE],
-					const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64])
+					const u_int64_t init_state[4][5], aes_prg & prg, bit_ctrs_t ctrs[64], u_int64_t & generated_p2s)
 {
 	u_int64_t P1[2 * BLONG_SIZE], C1[2 * BLONG_SIZE + ICEPOLE_TAG_SIZE/sizeof(u_int64_t)];
 	unsigned long long clen1 = sizeof(C1);
@@ -326,6 +331,7 @@ int the_attack_hack(const char * logcat, const u_int8_t key[KEY_SIZE], const u_i
 		u_int64_t p2_x_state_check[4][5];
 
 		generate_input_p2(bit, P1, P2);
+		generated_p2s++;
 		crypto_aead_encrypt_hack((unsigned char *)C2, &clen2, (const unsigned char *)P2, 2*BLOCK_SIZE, NULL, 0, NULL, iv, key, p2_x_state_check);
 		F2 = xor_state_bits(p2_x_state_check, bit, u3_omega_bits, 8);
 

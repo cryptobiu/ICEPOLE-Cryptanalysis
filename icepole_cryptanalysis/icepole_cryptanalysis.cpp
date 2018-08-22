@@ -134,29 +134,35 @@ void cryptanalysis()
 	u_int64_t U[4];
 	memset(U, 0, 4 * sizeof(u_int64_t));
 
+	size_t generated_p2s[3];
+	memset(generated_p2s, 0, 3 * sizeof(size_t));
+
 	u_int64_t real_init_state[4][5];
 	get_hacked_init_state(real_init_state, key, iv, logcat);
 
 	u_int64_t init_state[4][5];
 	get_honest_init_state(init_state, key, iv, logcat);
 
-	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, init_state, U[0], U[3]))
+	if(0 != ATTACK_U03::attack_u03(logcat, key, iv, init_state, U[0], U[3], generated_p2s[0]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u03() failure.", __FUNCTION__);
 		return;
 	}
 
-	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3]))
+	if(0 != ATTACK_U2::attack_u2(logcat, key, iv, U[2], U[0], U[3], generated_p2s[1]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u2() failure.", __FUNCTION__);
 		return;
 	}
 
-	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3]))
+	if(0 != ATTACK_U1::attack_u1(logcat, key, iv, U[1], U[0], U[2], U[3], generated_p2s[2]))
 	{
 		log4cpp::Category::getInstance(logcat).error("%s: attack_u1() failure.", __FUNCTION__);
 		return;
 	}
+
+	log4cpp::Category::getInstance(logcat).notice("%s: generated P2's: U03-phase = %lu; U2-phase = %lu; U1-phase = %lu;",
+			__FUNCTION__, generated_p2s[0], generated_p2s[1], generated_p2s[2]);
 
 	{
 		log4cpp::Category::getInstance(logcat).notice("%s: guessed U0 = 0x%016lX.", __FUNCTION__, U[0]);
