@@ -199,13 +199,8 @@ bool last_Sbox_lookup_filter(const u_int64_t * P_perm_output, const size_t bit_o
 
 	for(size_t i = 0; i < bit_count; ++i)
 	{
-		block_bit_t current_bit = bits[i];
-		current_bit.z = (current_bit.z + bit_offset)%64;
-
-		row_bits = get_block_row_bits(P_perm_output, current_bit.x, current_bit.z);
-		input_bit = 0;
-
-		if(lookup_Sbox_input_bit(row_bits, current_bit.y, input_bit))
+		row_bits = get_block_row_bits(P_perm_output, bits[i].x, (bits[i].z+bit_offset)%64);
+		if(lookup_Sbox_input_bit(row_bits, bits[i].y, input_bit))
 			F_xor_res ^= input_bit;
 		else
 			return false;
